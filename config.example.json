@@ -29,7 +29,8 @@
     "enabled": [
       "nanobanana",
       "chatgpt",
-      "klein"
+      "klein",
+      "anima"
     ]
   },
   "captioning": {
@@ -52,7 +53,8 @@
     "min_vram_gb": {
       "zimage": 24,
       "sdxl": 16,
-      "krea": 24
+      "krea": 24,
+      "anima": 16
     },
     "onstart": "",
     "template_hash": "471ed5903d8cdb8e63b0d0e50f6cd519",

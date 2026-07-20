@@ -10,7 +10,7 @@ const CapabilitiesContext = createContext(null)
 
 const EMPTY_CAPS = {
   configured: false,
-  engines: { nanobanana: false, chatgpt: false, klein: false },
+  engines: { nanobanana: false, chatgpt: false, klein: false, anima: false },
   comfyui: { reachable: false, api_url: '', models: {} },
   ollama: { reachable: false, installed: false, binary_path: '', url: '', vision_model: '', vision_model_ready: false },
   aitoolkit: { configured: false, valid: false },

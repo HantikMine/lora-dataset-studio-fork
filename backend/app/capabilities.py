@@ -76,6 +76,13 @@ def probe_gemini() -> dict:
     return {'ok': ok, 'detail': 'key set' if ok else 'key missing'}
 
 
+def probe_anima() -> dict:
+    """Anima engine readiness: the ANIMA_API_KEY env var is set."""
+    import os
+    ok = bool(os.environ.get('ANIMA_API_KEY', ''))
+    return {'ok': ok, 'detail': 'key set' if ok else 'ANIMA_API_KEY missing'}
+
+
 def probe_openai() -> dict:
     """ChatGPT engine readiness: a pay-per-use API key OR a connected ChatGPT
     subscription (Codex OAuth) both light the engine up."""
@@ -750,6 +757,7 @@ def probe(force=False) -> dict:
     ollama_installed = probe_ollama_installed()
     aitoolkit = probe_aitoolkit()
     gemini = probe_gemini()
+    anima = probe_anima()
     openai_ = probe_openai()
     face_scoring = probe_face_scoring()
     masks = probe_masks()
@@ -808,6 +816,7 @@ def probe(force=False) -> dict:
             'nanobanana': gemini['ok'],
             'chatgpt': openai_['ok'],
             'klein': klein_ready,
+            'anima': anima['ok'],
         },
         'chatgpt_subscription': {
             'connected': sub_status['connected'],

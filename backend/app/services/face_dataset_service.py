@@ -554,7 +554,7 @@ def set_fidelity(user_id, dataset_id, fidelity) -> bool:
 # NB : 'flux2klein' (FLUX.2 Klein) — PAS 'klein' : ce namespace est déjà pris par
 # le moteur de GÉNÉRATION (engines.klein, unet/klein/) ; un train_type 'klein'
 # télescoperait les résolveurs de modèles et les chemins loras du Studio.
-TRAIN_TYPES = ('zimage', 'sdxl', 'krea', 'flux', 'flux2klein')
+TRAIN_TYPES = ('zimage', 'sdxl', 'krea', 'flux', 'flux2klein', 'anima')
 
 
 def normalize_train_type(t) -> str:
@@ -3263,7 +3263,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
     # Style de caption : prose (Z-Image) vs tags booru (SDXL booru-native type bigLove).
     # Défaut AUTO selon le type entraîné ; un mode explicite (UI) l'emporte.
     ttype = (getattr(ds, 'train_type', None) or 'zimage').lower()
-    mode = (mode or ('booru' if ttype == 'sdxl' else 'prose')).lower()
+    mode = (mode or ('booru' if ttype in ('sdxl', 'anima') else 'prose')).lower()
     style = is_style(ds)
     if style:
         # Dataset STYLE : captions de CONTENU pur — le rendu n'est jamais décrit (le
@@ -3659,7 +3659,7 @@ def derive_short_captions(user_id, dataset_id, image_ids=None, force=False, mode
     if not ds or not dual_captions_enabled(ds):
         return 0
     ttype = (getattr(ds, 'train_type', None) or 'zimage').lower()
-    mode = (mode or ('booru' if ttype == 'sdxl' else 'prose')).lower()
+    mode = (mode or ('booru' if ttype in ('sdxl', 'anima') else 'prose')).lower()
     q = FaceDatasetImage.query.filter_by(dataset_id=dataset_id, status='keep')
     if image_ids is not None:
         ids = [int(i) for i in image_ids
@@ -4709,8 +4709,8 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
 # Both engines share the exact generate_variation contract (refs + prompt +
 # aspect -> bytes|None), so the whole fan-out below is engine-parametric. The
 # filename tag keeps the provenance readable in the dataset folder.
-API_ENGINES = ('nanobanana', 'chatgpt')
-_ENGINE_FILE_TAG = {'nanobanana': 'NBFace', 'chatgpt': 'GPTFace'}
+API_ENGINES = ('nanobanana', 'chatgpt', 'anima')
+_ENGINE_FILE_TAG = {'nanobanana': 'NBFace', 'chatgpt': 'GPTFace', 'anima': 'AnimaFace'}
 
 from .chatgpt_image import SubscriptionQuotaExceeded, SubscriptionUnavailable
 
@@ -4723,6 +4723,8 @@ _LOST_MSG = ('chatgpt: subscription connection lost — remaining rows stopped; 
 def _api_generate_fn(engine):
     if engine == 'chatgpt':
         from .chatgpt_image import generate_variation
+    elif engine == 'anima':
+        from .anima import generate_variation
     else:
         from .nanobanana import generate_variation
     return generate_variation
