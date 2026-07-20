@@ -396,6 +396,7 @@ function NewDatasetForm({ onCreate, onClose }) {
           <option value="krea">Krea 2 (prose captions)</option>
           <option value="flux">FLUX.1 (prose captions)</option>
           <option value="flux2klein">FLUX.2 Klein (prose captions)</option>
+          <option value="anima">Anima (booru-tag captions)</option>
         </select>
       </label>
       {/* Fidélité (personnage) : visage seul (défaut) vs visage + corps. En mode corps,

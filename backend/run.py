@@ -93,4 +93,4 @@ if __name__ == '__main__':
             host=host,
             # LDS_PORT wins over config so the launcher can dodge a busy 5000
             # (macOS AirPlay, another Flask app, …) without touching config.json.
-            port=port, threaded=True, use_reloader=False)
+            port=port, threaded=True, use_reloader=True)
