@@ -769,7 +769,7 @@ _DROPOUT_CHOICES = (0.05, 0.1, 0.15, 0.2, 0.3)          # LoRA network dropout ;
 _ALPHA_CHOICES = (1, 2, 4, 8, 16, 24, 32, 48, 64)       # alpha découplé du rank ; absent = dérivé
 _TIMESTEP_TYPE_CHOICES = ('sigmoid', 'linear', 'weighted', 'shift')  # pondération flowmatch ; SDXL le désactive
 _DEFAULT_TIMESTEP = {'zimage': 'sigmoid', 'krea': 'linear', 'flux': 'sigmoid',
-                     'flux2klein': 'weighted'}   # ce que « Auto » résout (sdxl : aucun) ; flux subject → sigmoid (reco ai-toolkit) ; flux2klein → weighted (défaut canonique options.ts, PAS sigmoid)
+                     'flux2klein': 'weighted', 'anima': 'sigmoid'}   # ce que « Auto » résout
 # Batch 2 — optimiseur / planning du LR / batch effectif (valeurs VÉRIFIÉES dans
 # ai-toolkit : get_optimizer + toolkit/scheduler.py). CAME n'est PAS supporté.
 _OPTIMIZER_CHOICES = ('adamw8bit', 'adafactor', 'automagic', 'prodigy')
@@ -1944,6 +1944,15 @@ BUILTIN_TRAIN_PRESETS = [
                        'timesteps, 500-step probes.',
         'settings': _concept_preset_settings(32, 16, timestep_type='weighted'),
     },
+    # Anima 2B — Character & Concept
+    {'id': 'builtin-character-anima', 'name': 'Anima · Character', 'train_type': 'anima',
+     'dataset_kind': 'character', 'variants': [], 'builtin': True,
+     'description': 'Rank 16/16 for the 2B anime model — conservative start for identity, sigmoid timesteps, 250-step probes.',
+     'settings': _character_preset_settings(16, 16, timestep_type='sigmoid')},
+    {'id': 'builtin-concept-anima', 'name': 'Anima · Concept', 'train_type': 'anima',
+     'dataset_kind': 'concept', 'variants': [], 'builtin': True,
+     'description': 'Generalize on Anima: rank 16, half alpha 8, weighted timesteps, 500-step probes.',
+     'settings': _concept_preset_settings(16, 8, timestep_type='weighted')},
     # Legacy generic Style alias. The API hides it from GET and resolves its ID
     # to a family-specific built-in at apply time. Keep the raw entry only for
     # older callers/tests that imported BUILTIN_TRAIN_PRESETS directly. Style
@@ -2463,6 +2472,12 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
         _apply_slider_overrides(ds, cfg_['config']['process'][0], 'flux2klein')
         _apply_dual_captions(ds, cfg_['config']['process'][0], dataset_folder)
         return cfg_
+    if _train_type(ds) == 'anima':
+        cfg_ = _build_job_config_anima(ds, dataset_folder, steps, training_folder=training_folder)
+        _apply_style_overrides(ds, cfg_['config']['process'][0], 'anima')
+        _apply_slider_overrides(ds, cfg_['config']['process'][0], 'anima')
+        _apply_dual_captions(ds, cfg_['config']['process'][0], dataset_folder)
+        return cfg_
     trigger = _safe_trigger(ds)
     base_model = getattr(ds, 'train_base_model', None)
     recipe = zimage_training_recipe(getattr(ds, 'train_variant', None), base_model)
@@ -2872,6 +2887,29 @@ def _build_job_config_sdxl(ds, dataset_folder: str, steps: int, training_folder=
             }],
         },
     }
+
+
+def _build_job_config_anima(ds, dataset_folder: str, steps: int, training_folder=None) -> dict:
+    """Job-config ai-toolkit arch='anima' — Anima 2B anime model. Flow-matching, Danbooru captions."""
+    trigger = _safe_trigger(ds)
+    base_model = getattr(ds, 'train_base_model', None)
+    model = {'arch': 'anima', 'name_or_path': base_model if base_model else 'circlestone-labs/Anima',
+             'quantize': True, 'quantize_te': True, 'low_vram': True, 'qtype': 'qfloat8'}
+    _arank = _lora_rank(ds, 'anima')
+    return {'job': 'extension', 'config': {'name': f'lora_{trigger}', 'process': [{
+        'type': 'sd_trainer', 'training_folder': (training_folder or str(_output_dir() / _run_name(ds))),
+        'device': 'cuda:0', 'trigger_word': trigger, 'network': _network_block(ds, _arank, 'anima'),
+        'save': {'dtype': 'float16', 'save_every': _save_every(ds), 'max_step_saves_to_keep': _max_step_saves(ds)},
+        'datasets': [{'folder_path': dataset_folder, 'caption_ext': 'txt', 'caption_dropout_rate': 0.05,
+                      'cache_latents_to_disk': True, 'resolution': _train_res(ds), **_mask_fields(dataset_folder)}],
+        'train': {'batch_size': 1, 'steps': steps, 'gradient_accumulation': _grad_accum(ds),
+                  'train_unet': True, 'train_text_encoder': False, 'gradient_checkpointing': True,
+                  'noise_scheduler': 'flowmatch', 'timestep_type': _timestep_type_eff(ds, 'sigmoid'),
+                  'optimizer': _optimizer_eff(ds), 'lr': _lr_eff(ds), 'dtype': 'bf16',
+                  **_lr_sched_fields(ds), **_ema_fields(ds)},
+        'model': model, 'sample': {'sampler': 'flowmatch', 'neg': '', 'sample_every': _sample_every(ds),
+                                   'guidance_scale': 4.5, 'sample_steps': 30, 'prompts': _sample_prompts(ds, trigger)},
+    }]}}
 
 
 _CK_RE = re.compile(r'_(\d{4,})\.safetensors$')
@@ -3638,9 +3676,9 @@ def style_caption_quality(dataset_id) -> dict:
 # SDXL (booru, plus gourmand en variété) et laissait passer des runs voués au
 # surapprentissage.
 TRAIN_MIN_IMAGES = {'zimage': (12, 20), 'sdxl': (20, 30), 'krea': (15, 20), 'flux': (15, 20),
-                    'flux2klein': (15, 20)}
+                    'flux2klein': (15, 20), 'anima': (15, 20)}
 _FAMILY_LABEL = {'zimage': 'Z-Image', 'sdxl': 'SDXL', 'krea': 'Krea 2', 'flux': 'FLUX.1',
-                 'flux2klein': 'FLUX.2 Klein'}
+                 'flux2klein': 'FLUX.2 Klein', 'anima': 'Anima'}
 # VRAM mesurée : Krea 2 (12B) sature un 24 GB à 1024 (cf. KREA_TRAIN_RESOLUTION). Flux
 # est un DiT de même classe (12B) → même seuil recommandé.
 _KREA_MIN_VRAM_GB = 24
