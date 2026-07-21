@@ -25,17 +25,19 @@ _MODEL = 'google/gemma-4-31b-it'
 
 # ── VLM Prompt ─────────────────────────────────────────────────────────────
 # The model must output ONLY valid JSON with two fields:
-#   tags:       space-separated Danbooru tags (quality + appearance)
-#   description: natural-language paragraph describing the character
-_VLM_PROMPT = """Analyze this image of a character. Output ONLY valid JSON — no markdown, no code fences, no prefacing text.
+#   tags:       comma-separated Danbooru tags — PERMANENT traits only (hair, eyes, face, body, skin)
+#   clothing:   tags describing clothes seen in THIS photo (NOT permanent)
+#   description: one-sentence natural-language description
+_VLM_PROMPT = """Analyze this character photo. Output ONLY valid JSON, no markdown.
 
-Return a JSON object with exactly these two fields:
+Return exactly:
 {
-  "tags": "space-separated Danbooru tags describing the character's permanent appearance traits — hair color, hair style, eye color, skin tone, face shape, body type, distinguishing marks. Include quality tags: masterpiece, best quality. Include safety tag: safe. Include the subject tag: 1girl. Use ONLY tags, no English prose.",
-  "description": "one smooth English paragraph describing the character's appearance in natural language — hair, eyes, face, body, clothing visible in the photo. Keep it factual and SFW."
+  "tags": "comma-separated Danbooru tags of PERMANENT identity traits — hair color, hair style, eye color, skin tone, face shape, body type. Include: masterpiece, best quality, safe, 1girl",
+  "clothing": "comma-separated tags for the OUTFIT visible in this photo — will be REPLACED per shot",
+  "description": "ONE short sentence describing the character's face and body in natural English"
 }
-
-Remember: output ONLY the JSON object, nothing else."""
+Only PERMANENT traits go in "tags". Clothing/setting go in "clothing" — they change per shot.
+Output ONLY the JSON object."""
 
 
 def describe_character(image_path: str) -> dict | None:
@@ -138,9 +140,10 @@ def describe_character(image_path: str) -> dict | None:
 
     tags = (result.get('tags') or '').strip()
     description = (result.get('description') or '').strip()
+    clothing = (result.get('clothing') or '').strip()
 
     if not tags and not description:
         logger.warning('anima_vision: empty response from VLM')
         return None
 
-    return {'tags': tags, 'description': description}
+    return {'tags': tags, 'description': description, 'clothing': clothing}

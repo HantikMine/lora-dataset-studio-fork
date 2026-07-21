@@ -23,73 +23,34 @@ def _api_key() -> str:
 
 
 def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> str:
-    """Build a full Anima prompt: quality tags + character tags + shot tags,
-    then character description + shot suffix as natural language.
+    """Build an Anima prompt: quality tags + character identity tags (ONLY permanent traits)
+    + shot description. VLM clothing/description are NOT injected — only identity tags.
 
-    Follows anima-prompt skill conventions:
-      - Tag sections in order: quality → character → shot
-      - Comma-separated tags first, then natural language
-      - No parentheses, no weighting — flat text
+    Structure: mastery tags, identity tags, shot description.
     """
-    parts: list[str] = []
-
-    # --- Tag block ---
-    tags: list[str] = []
-
     # Quality tags (always)
-    quality = ['masterpiece', 'best quality', 'score_7']
-    tags.extend(quality)
+    base = 'masterpiece, best quality, score_7'
 
-    # Character tags from VLM
-    char_tags = ''
-    char_desc = ''
+    # Permanent identity tags only — hair, eyes, face, body, skin.
+    # The VLM now returns 'clothing' separately; we IGNORE it here.
+    # Shot description carries the scene/pose/framing.
+    identity = ''
     if character_desc:
-        char_tags = (character_desc.get('tags') or '').strip()
-        char_desc = (character_desc.get('description') or '').strip()
+        identity = (character_desc.get('tags') or '').strip()
 
-    if char_tags:
-        for tag in char_tags.split(','):
-            tag = tag.strip()
-            if tag and tag.lower() not in [t.lower() for t in tags]:
-                tags.append(tag)
+    sp = (shot_prompt or '').strip()
+    # Strip quality prefix if already present
+    if sp.lower().startswith('masterpiece'):
+        sp = sp.split(',', 3)[-1].strip().lstrip(',')
 
-    # Shot tags from the catalog entry (already Danbooru format)
-    if shot_prompt:
-        shot_prompt = shot_prompt.strip()
-        # If the shot prompt already starts with quality tags, don't duplicate
-        if shot_prompt.lower().startswith('masterpiece'):
-            shot_prompt = shot_prompt[len('masterpiece, best quality, score_7,'):].strip().lstrip(',')
-            shot_prompt = shot_prompt.strip()
+    parts = [base]
+    if identity:
+        parts.append(identity)
+    if sp:
+        parts.append(sp)
 
-    # Build tag block
-    tag_block = ', '.join(tags)
-    if shot_prompt:
-        # Shot prompts might be space-separated tags or descriptive
-        # If it looks like tags (comma or space-separated single words),
-        # append to tag block. Otherwise treat as description.
-        is_taggy = ',' in shot_prompt or all(
-            len(w) < 30 and not w.endswith('.') for w in shot_prompt.split()[:4]
-        )
-        if is_taggy:
-            tag_block = f'{tag_block}, {shot_prompt}'
-        else:
-            # It's a natural language description — goes after tags
-            pass
-
-    parts.append(tag_block)
-
-    # --- Natural language block ---
-    desc_parts = []
-    if char_desc:
-        desc_parts.append(char_desc)
-    if shot_prompt and not is_taggy:
-        desc_parts.append(shot_prompt)
-    if desc_parts:
-        parts.append('. '.join(desc_parts) + '.')
-
-    prompt = '. '.join(parts)
-    # Clean up: no double spaces, no trailing comma before period
-    prompt = prompt.replace('  ', ' ').replace(', .', '.').strip()
+    prompt = ', '.join(parts)
+    prompt = prompt.replace('  ', ' ').strip()
     return prompt
 
 

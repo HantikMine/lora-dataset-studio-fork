@@ -4819,7 +4819,11 @@ def _run_nanobanana_batch(app, items, ref_bytes, engine='nanobanana', dataset_id
             if engine == 'anima':
                 # Anima: raw Danbooru prompt, no identity guard wrapper.
                 # Character description (from VLM) enriches every shot.
-                out = api_generate(ref_bytes, prompt,
+                # Apply suffix (creative direction) directly to the prompt.
+                ap = prompt
+                if suffix and suffix.strip():
+                    ap = f'{prompt}, {suffix.strip()}'
+                out = api_generate(ref_bytes, ap,
                                    aspect_ratio=aspect,
                                    character_desc=character_desc)
             else:
