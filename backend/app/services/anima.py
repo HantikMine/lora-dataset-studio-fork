@@ -59,16 +59,36 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
                          'fake_smile', 'forced_smile', 'seductive_smile', 'evil_smile',
                          'naughty_face', 'looking_at_viewer', 'looking_away',
                          'looking_back', 'looking_up', 'looking_down', 'looking_to_the_side'}
+    # Also strip clothing/accessories that VLM might leak into identity fields
+    _clothing_strip = {'bra', 'lace', 'panties', 'underwear', 'robe', 'shawl', 'fur_stole',
+                       'necklace', 'bracelet', 'ring', 'earring', 'earrings', 'necklace',
+                       'hat', 'straw_hat', 'baseball_cap', 'beanie', 'beret', 'cap',
+                       'sunglasses', 'glasses', 'headband', 'ribbon', 'hair_ribbon',
+                       'bow', 'hair_bow', 'bow_tie', 'tie', 'scarf', 'belt', 'watch',
+                       'choker', 'anklet', 'stockings', 'socks', 'tights', 'pantyhose',
+                       'shoes', 'boots', 'heels', 'sandals', 'sneakers', 'bikini',
+                       'swimsuit', 'dress', 't-shirt', 'shirt', 'blouse', 'jacket',
+                       'coat', 'hoodie', 'sweater', 'cardigan', 'skirt', 'shorts',
+                       'pants', 'jeans', 'leggings', 'swimwear', 'bodysuit', 'corset',
+                       'leotard', 'tank_top', 'crop_top', 'camisole'}
     identity_parts = []
     if character_desc:
         for region in regions:
             v = (character_desc.get(region) or '').strip()
             if v:
-                # Filter out expression/emotion tags from identity
-                filtered = ', '.join(
-                    t.strip() for t in v.split(',')
-                    if t.strip().lower() not in _expression_strip
-                )
+                # Filter out expression + clothing tags from identity
+                _strip = _expression_strip | _clothing_strip
+                filtered_tags = []
+                for t in v.split(','):
+                    t = t.strip()
+                    tl = t.lower()
+                    # Exact match OR tag contains a clothing keyword
+                    if tl in _strip:
+                        continue
+                    if any(c in tl for c in _clothing_strip):
+                        continue
+                    filtered_tags.append(t)
+                filtered = ', '.join(filtered_tags)
                 if filtered:
                     identity_parts.append(filtered)
 
@@ -79,9 +99,15 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
     if character_desc:
         neg_tags = (character_desc.get('negative') or '').strip()
         if neg_tags:
-            neg_prefix = ' '.join(
-                f'({t.strip()}:-1)' for t in neg_tags.split(',') if t.strip()
-            )
+            # Clean each tag: remove parenthesized clarifications like "glasses (worn on face)"
+            # Do NOT filter clothing from negatives — they're SUPPOSED to be there
+            import re as _re
+            neg_list = []
+            for t in neg_tags.split(','):
+                t = _re.sub(r'\s*\(.*?\)\s*', '', t).strip()
+                if t:
+                    neg_list.append(t)
+            neg_prefix = ' '.join(f'({t}:-1)' for t in neg_list)
 
     # Format: (negative:-1)... identity_tags, shot_description
     if neg_prefix and identity:

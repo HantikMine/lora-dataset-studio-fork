@@ -45,7 +45,7 @@ CRITICAL RULES:
 - Each field is independent — a "bust" shot will use subject+head+upper; a "full body" shot uses ALL
 - Be EXHAUSTIVE in each category. 15+ tags in head, 8+ in upper, 8+ in lower, 3+ in body_global
 - Use ONLY Danbooru tags (lowercase, underscores). NO natural-language sentences
-- NEVER describe clothing — that changes per shot
+- NEVER describe clothing, accessories, hats, glasses, jewelry — ABSOLUTELY NO CLOTHING in head/upper/lower fields. Those change per shot.
 - NEVER include expression tags (smiling/frown/grin/etc) — expression changes per shot, not permanent
 - NEVER include emotional or mood descriptors — those are NOT physical identity traits
 - Output ONLY the JSON object"""
