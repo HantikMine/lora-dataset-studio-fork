@@ -38,7 +38,7 @@ A downstream system injects your output into image prompts. Because different sh
   "upper": "comma-separated traits for UPPER BODY: neck, shoulders, bust/chest size, arm build, torso build — everything from neck to waist",
   "lower": "comma-separated traits for LOWER BODY: hip width, leg build, thigh build, waist-to-hip ratio — everything from waist down",
   "body_global": "comma-separated GLOBAL body traits: body type (slender/curvy/athletic/petite), height (tall/short), skin tone if not already in head",
-  "negative": "comma-separated tags of traits this character EXPLICITLY does NOT have and should NEVER appear. Look at what is ABSENT: if hair is NOT curly, add 'curly hair'. If NOT muscular, add 'muscular'. If NOT chubby, add 'chubby'. If NOT wearing glasses, add 'glasses'. If NOT male, add '1boy, male'. This prevents wrong traits in generated images."
+  "negative": "comma-separated tags of PHYSICAL APPEARANCE traits this character does NOT have. Look at what is ABSENT: if hair is NOT curly, add 'curly hair'. If NOT muscular, add 'muscular build'. If NOT chubby, add 'chubby'. If NOT tall, add 'tall'. If NOT tanned, add 'tanned skin'. If NOT blue eyes, add 'blue eyes'. ONLY negate physical body traits — NEVER negate clothing, accessories, hats, glasses, jewelry, poses, expressions, or backgrounds."
 }
 
 CRITICAL RULES:

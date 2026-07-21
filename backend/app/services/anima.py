@@ -88,7 +88,12 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
                     if any(c in tl for c in _clothing_strip):
                         continue
                     filtered_tags.append(t)
-                filtered = ', '.join(filtered_tags)
+                # Emphasize key identity traits: wrap in (tag:1.3) for stronger adherence
+                weighted = ', '.join(
+                    f'({t}:1.3)' if not t.startswith('(') else t
+                    for t in filtered_tags
+                )
+                filtered = weighted
                 if filtered:
                     identity_parts.append(filtered)
 
