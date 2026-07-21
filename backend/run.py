@@ -1,5 +1,20 @@
 import sys, os
 
+# Load .env BEFORE importing the app — otherwise API keys aren't available
+# to background threads spawned by the Flask server.
+def _load_dotenv():
+    for d in (os.path.dirname(__file__), os.path.dirname(os.path.dirname(__file__))):
+        env = os.path.join(d, '.env') if d else None
+        if env and os.path.isfile(env):
+            with open(env) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, v = line.split('=', 1)
+                        os.environ.setdefault(k.strip(), v.strip())
+            break
+_load_dotenv()
+
 
 def _reexec_into_venv():
     """Run on the project's pinned interpreter, not whatever Python launched us.
