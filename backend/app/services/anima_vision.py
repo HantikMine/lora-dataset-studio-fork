@@ -28,16 +28,23 @@ _MODEL = 'google/gemma-4-31b-it'
 #   tags:       comma-separated Danbooru tags — PERMANENT traits only (hair, eyes, face, body, skin)
 #   clothing:   tags describing clothes seen in THIS photo (NOT permanent)
 #   description: one-sentence natural-language description
-_VLM_PROMPT = """Analyze this character photo. Output ONLY valid JSON, no markdown.
+_VLM_PROMPT = """You are a character analysis expert for anime image generation. Examine this photo in extreme detail. Output ONLY valid JSON — no markdown, no explanations.
 
-Return exactly:
+Describe EVERY visible permanent trait of the person. Be thorough and specific. Return exactly:
+
 {
-  "tags": "comma-separated Danbooru tags of PERMANENT identity traits — hair color, hair style, eye color, skin tone, face shape, body type. Include: masterpiece, best quality, safe, 1girl",
-  "clothing": "comma-separated tags for the OUTFIT visible in this photo — will be REPLACED per shot",
-  "description": "ONE short sentence describing the character's face and body in natural English"
+  "tags": "comma-separated Danbooru tags listing ALL visible permanent identity traits. Start with: masterpiece, best quality, safe, 1girl. Then include EVERY visible trait: hair color, hair length, hair style (straight/wavy/curly/ponytail/bun/braided/etc), bangs style, eye color, eye shape, skin tone, face shape, nose, lips, eyebrows, body type/build, height appearance, any visible marks (freckles/moles/scars). Be exhaustive — every visible detail becomes a tag.",
+  "clothing": "comma-separated tags for the OUTFIT visible in this photo — top, bottom, shoes, accessories, jewelry. These will be REPLACED per shot so describe them accurately but they are NOT permanent.",
+  "description": "ONE paragraph of 2-3 sentences describing this specific character in natural English. Cover: approximate age appearance, face shape, eye color and shape, hair (color, length, style, texture), skin tone, body build, and any distinctive features that make this person recognizable. Be vivid and precise."
 }
-Only PERMANENT traits go in "tags". Clothing/setting go in "clothing" — they change per shot.
-Output ONLY the JSON object."""
+
+CRITICAL RULES:
+- Tags and clothing use ONLY comma-separated Danbooru style (e.g. 'long hair, black hair, straight hair, blunt bangs')
+- Description uses natural English sentences
+- Tags describe PERMANENT traits that stay the same in any outfit or scene
+- Clothing describes what is visible NOW — it will change per shot
+- Be MAXIMALLY detailed — rather 30 accurate tags than 10 vague ones
+- Output ONLY the JSON object, nothing else"""
 
 
 def describe_character(image_path: str) -> dict | None:
