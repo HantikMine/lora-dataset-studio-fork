@@ -185,12 +185,12 @@ def generate_variation(
     if isinstance(output, list) and len(output) > 0:
         item = output[0]
         if isinstance(item, dict):
-            b64 = item.get('image_url') or ''
+            b64 = (item.get('image_url') or '').strip()
             if b64:
                 try:
                     return base64.b64decode(b64)
-                except Exception:
-                    logger.warning('anima: failed to decode base64 from image_url')
+                except Exception as exc:
+                    logger.warning(f'anima: failed to decode base64 ({len(b64)} chars, starts with {b64[:20]}...): {exc}')
                     return None
         return None
 
