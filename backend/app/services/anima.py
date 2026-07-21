@@ -28,8 +28,8 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
 
     Structure: mastery tags, identity tags, shot description.
     """
-    # Quality tags (always)
-    base = 'masterpiece, best quality, score_7'
+    # Quality tags — not needed for Anima, let VLM/prompt carry the quality
+    base = ''
 
     # Permanent identity tags only — hair, eyes, face, body, skin.
     # The VLM now returns 'clothing' separately; we IGNORE it here.
@@ -52,7 +52,9 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
             if t.strip().lower() not in _quality_prefixes
         )
 
-    parts = [base]
+    parts = []
+    if base:
+        parts.append(base)
     if identity:
         parts.append(identity)
     if sp:
