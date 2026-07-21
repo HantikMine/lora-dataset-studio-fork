@@ -105,7 +105,8 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
             neg_list = []
             for t in neg_tags.split(','):
                 t = _re.sub(r'\s*\(.*?\)\s*', '', t).strip()
-                if t:
+                # Strip gender/1boy/1girl from negatives — redundant, already in subject
+                if t and t.lower() not in ('1boy', '1girl', 'male', 'female'):
                     neg_list.append(t)
             neg_prefix = ', '.join(neg_list) + ',' if neg_list else ''
 

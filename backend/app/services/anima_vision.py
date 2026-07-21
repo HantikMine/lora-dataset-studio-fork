@@ -48,7 +48,7 @@ CRITICAL RULES:
 - Use ONLY Danbooru tags (lowercase, underscores) for tag fields
 - NEVER describe clothing, accessories, hats, glasses, jewelry — ABSOLUTELY NO CLOTHING in head/upper/lower fields. Those change per shot.
 - NEVER include expression tags (smiling/frown/grin/etc) — expression changes per shot, not permanent
-- NEVER include emotional or mood descriptors — those are NOT physical identity traits
+- NEVER include expression tags, mood descriptors, or gender tags (1boy/1girl) — those are NOT for negatives.
 - Output ONLY the JSON object"""
 
 
