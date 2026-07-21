@@ -39,9 +39,18 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
         identity = (character_desc.get('tags') or '').strip()
 
     sp = (shot_prompt or '').strip()
-    # Strip quality prefix if already present
+    # Strip quality prefix if already present on either source
+    _quality_prefixes = ('masterpiece', 'best quality', 'score_7', 'score_8', 'score_9',
+                         'safe', 'nsfw')
     if sp.lower().startswith('masterpiece'):
         sp = sp.split(',', 3)[-1].strip().lstrip(',')
+
+    # Strip quality/prefix tags from VLM identity to avoid duplication
+    if identity:
+        identity = ', '.join(
+            t.strip() for t in identity.split(',')
+            if t.strip().lower() not in _quality_prefixes
+        )
 
     parts = [base]
     if identity:
@@ -123,7 +132,7 @@ def generate_variation(
     }
 
     try:
-        print(f'[anima] prompt ({len(full_prompt)} chars): {full_prompt[:300]}...', flush=True)
+        print(f'[anima] prompt ({len(full_prompt)} chars):\n{full_prompt}', flush=True)
         logger.info(f'anima: prompt ({len(full_prompt)} chars): {full_prompt[:300]}...')
         r = requests.post(
             _ANIMA_ENDPOINT, headers=headers, json={'input': input_payload},
