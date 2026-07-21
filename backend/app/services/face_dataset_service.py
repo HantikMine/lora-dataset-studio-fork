@@ -4768,7 +4768,8 @@ def _run_nanobanana_batch(app, items, ref_bytes, engine='nanobanana', dataset_id
     # Anima: resolve character description from VLM once (expensive, cached per dataset).
     character_desc = None
     if engine == 'anima' and dataset_id is not None:
-        ds = get_dataset(str(dataset_id))  # not LOCAL_USER — just need the object
+        from .. import config as _cfg
+        ds = get_dataset(_cfg.LOCAL_USER, str(dataset_id))
         if ds and ds.ref_filename:
             ref_path = _ref_path(ds)
             if os.path.exists(ref_path):
