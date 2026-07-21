@@ -23,44 +23,43 @@ def _api_key() -> str:
 
 
 def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> str:
-    """Build an Anima prompt: quality tags + character identity tags (ONLY permanent traits)
-    + shot description. VLM clothing/description are NOT injected — only identity tags.
+    """Build an Anima prompt by injecting ONLY the body-region traits relevant
+    to the shot's framing.
 
-    Structure: mastery tags, identity tags, shot description.
+    The VLM returns categorized fields:
+      subject, head, upper, lower, body_global
+
+    Framing detection (from shot_prompt text):
+      face/close-up → subject + head + body_global
+      bust/upper body → subject + head + upper + body_global
+      full body → all fields
+      back → head + body_global (no face)
+      unknown → subject + head + body_global (safe default)
     """
-    # Quality tags — not needed for Anima, let VLM/prompt carry the quality
-    base = ''
-
-    # Permanent identity tags only — hair, eyes, face, body, skin.
-    # The VLM now returns 'clothing' separately; we IGNORE it here.
-    # Shot description carries the scene/pose/framing.
-    identity = ''
-    if character_desc:
-        identity = (character_desc.get('tags') or '').strip()
-
     sp = (shot_prompt or '').strip()
-    # Strip quality prefix if already present on either source
-    _quality_prefixes = ('masterpiece', 'best quality', 'score_7', 'score_8', 'score_9',
-                         'safe', 'nsfw')
-    if sp.lower().startswith('masterpiece'):
-        sp = sp.split(',', 3)[-1].strip().lstrip(',')
+    sp_lower = sp.lower()
 
-    # Strip quality/prefix tags from VLM identity to avoid duplication
-    if identity:
-        identity = ', '.join(
-            t.strip() for t in identity.split(',')
-            if t.strip().lower() not in _quality_prefixes
-        )
+    # Detect framing from keywords in the shot prompt
+    if any(w in sp_lower for w in ('full body', 'standing', 'full-body', 'feet', 'kneeling', 'sitting')):
+        regions = ('subject', 'head', 'upper', 'lower', 'body_global')
+    elif any(w in sp_lower for w in ('bust', 'upper body', 'upper-body', 'waist')):
+        regions = ('subject', 'head', 'upper', 'body_global')
+    else:
+        # Default: face / close-up / unknown → conservative, head+body
+        regions = ('subject', 'head', 'body_global')
 
-    parts = []
-    if base:
-        parts.append(base)
-    if identity:
-        parts.append(identity)
-    if sp:
-        parts.append(sp)
+    # Build identity tags from VLM, only from selected regions
+    identity_parts = []
+    if character_desc:
+        for region in regions:
+            v = (character_desc.get(region) or '').strip()
+            if v:
+                identity_parts.append(v)
 
-    prompt = ', '.join(parts)
+    identity = ', '.join(identity_parts)
+
+    # Format: identity_tags, shot_description, (negative)
+    prompt = f'{identity}, {sp}' if identity else sp
     prompt = prompt.replace('  ', ' ').strip()
     return prompt
 

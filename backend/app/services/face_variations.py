@@ -222,8 +222,8 @@ def wrap_variation_klein(prompt: str, nsfw: bool = False, framing: str | None = 
 #     CONCRÈTE mais variée (les modèles d'édition suivent mieux une consigne « porte X »
 #     qu'un vide qu'ils comblent par la réf). Baker la directive dans le TEXTE du prompt
 #     la propage partout (API + Klein + persistance variation_prompt + régénération).
-OUTFIT_VARY = ('wearing a different casual everyday outfit, varied in style and colour')
-EXPRESSION_NEUTRAL = ('a calm neutral facial expression')
+OUTFIT_VARY = ('casual outfit, t-shirt, jeans')
+EXPRESSION_NEUTRAL = ('neutral expression')
 
 # Détecteurs « le texte nomme-t-il DÉJÀ une tenue / une expression ? » (mots entiers).
 # Servent à n'ajouter la directive par défaut qu'aux entrées qui n'en portent pas —

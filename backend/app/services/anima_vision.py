@@ -25,26 +25,27 @@ _MODEL = 'google/gemma-4-31b-it'
 
 # ── VLM Prompt ─────────────────────────────────────────────────────────────
 # The model must output ONLY valid JSON with two fields:
-#   tags:       comma-separated Danbooru tags — PERMANENT traits only (hair, eyes, face, body, skin)
-#   clothing:   tags describing clothes seen in THIS photo (NOT permanent)
-#   description: one-sentence natural-language description
-_VLM_PROMPT = """You are a character analysis expert for anime image generation. Examine this photo in extreme detail. Output ONLY valid JSON — no markdown, no explanations.
+#   Each field is comma-separated Danbooru tags.
+#   The code below then selects which fields to inject based on the shot's framing
+#   (close-up face → only head/hair/face; bust → +upper body; full body → all).
+_VLM_PROMPT = """You are an anime character profiling expert. Analyze this photo and output ONLY a JSON object. No markdown, no explanations.
 
-Describe EVERY visible permanent trait of the person. Be thorough and specific. Return exactly:
+A downstream system injects your output into image prompts. Because different shots show different body parts (close-up face, bust, full body), you MUST split traits into EXACTLY these five fields:
 
 {
-  "tags": "comma-separated Danbooru tags listing ALL visible permanent identity traits. Start with: masterpiece, best quality, safe, 1girl. Then include EVERY visible trait: hair color, hair length, hair style (straight/wavy/curly/ponytail/bun/braided/etc), bangs style, eye color, eye shape, skin tone, face shape, nose, lips, eyebrows, body type/build, height appearance, any visible marks (freckles/moles/scars). Be exhaustive — every visible detail becomes a tag.",
-  "clothing": "comma-separated tags for the OUTFIT visible in this photo — top, bottom, shoes, accessories, jewelry. These will be REPLACED per shot so describe them accurately but they are NOT permanent.",
-  "description": "ONE paragraph of 2-3 sentences describing this specific character in natural English. Cover: approximate age appearance, face shape, eye color and shape, hair (color, length, style, texture), skin tone, body build, and any distinctive features that make this person recognizable. Be vivid and precise."
+  "subject": "comma-separated: 1girl (or 1boy), plus age-range tag like 'teen' or 'adult' or 'mature'",
+  "head": "comma-separated traits for HEAD AND FACE ONLY: hair color, hair length, hair texture (straight/wavy/curly), hair style (ponytail/bun/loose/braided), bangs, eye color, eye shape, skin tone, face shape, nose, lips, eyebrows, expression lines, makeup",
+  "upper": "comma-separated traits for UPPER BODY: neck, shoulders, bust/chest size, arm build, torso build — everything from neck to waist",
+  "lower": "comma-separated traits for LOWER BODY: hip width, leg build, thigh build, waist-to-hip ratio — everything from waist down",
+  "body_global": "comma-separated GLOBAL body traits: body type (slender/curvy/athletic/petite), height (tall/short), skin tone if not already in head"
 }
 
 CRITICAL RULES:
-- Tags and clothing use ONLY comma-separated Danbooru style (e.g. 'long hair, black hair, straight hair, blunt bangs')
-- Description uses natural English sentences
-- Tags describe PERMANENT traits that stay the same in any outfit or scene
-- Clothing describes what is visible NOW — it will change per shot
-- Be MAXIMALLY detailed — rather 30 accurate tags than 10 vague ones
-- Output ONLY the JSON object, nothing else"""
+- Each field is independent — a "bust" shot will use subject+head+upper; a "full body" shot uses ALL
+- Be EXHAUSTIVE in each category. 15+ tags in head, 8+ in upper, 8+ in lower, 3+ in body_global
+- Use ONLY Danbooru tags (lowercase, underscores). NO natural-language sentences in these fields
+- NEVER describe clothing — that changes per shot and is handled separately
+- Output ONLY the JSON object"""
 
 
 def describe_character(image_path: str) -> dict | None:
@@ -145,12 +146,18 @@ def describe_character(image_path: str) -> dict | None:
             logger.warning(f'anima_vision: unparseable JSON: {content[:200]}')
             return None
 
-    tags = (result.get('tags') or '').strip()
-    description = (result.get('description') or '').strip()
-    clothing = (result.get('clothing') or '').strip()
+    # Return all five categorized fields
+    subject = (result.get('subject') or '').strip()
+    head = (result.get('head') or '').strip()
+    upper = (result.get('upper') or '').strip()
+    lower = (result.get('lower') or '').strip()
+    body_global = (result.get('body_global') or '').strip()
 
-    if not tags and not description:
+    if not subject and not head:
         logger.warning('anima_vision: empty response from VLM')
         return None
 
-    return {'tags': tags, 'description': description, 'clothing': clothing}
+    return {
+        'subject': subject, 'head': head, 'upper': upper,
+        'lower': lower, 'body_global': body_global,
+    }
