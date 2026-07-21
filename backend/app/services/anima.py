@@ -86,6 +86,9 @@ def generate_variation(
 
     full_prompt = build_anima_prompt(prompt, character_desc)
 
+    # Anti-dupe: prevent multiple copies of the same character
+    full_prompt = f'{full_prompt}, (multiple_girls:-1)'
+
     input_payload = {
         'prompt': full_prompt,
         'seed': 0,
@@ -119,6 +122,7 @@ def generate_variation(
     }
 
     try:
+        logger.info(f'anima: prompt ({len(full_prompt)} chars): {full_prompt[:300]}...')
         r = requests.post(
             _ANIMA_ENDPOINT, headers=headers, json={'input': input_payload},
             timeout=(10, 180),
