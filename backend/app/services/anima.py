@@ -181,6 +181,20 @@ def generate_variation(
         logger.warning('anima: no output in response')
         return None
 
+    # RunPod returns output as a LIST of dicts: [{'image_url': '<base64>', 'seed': ...}]
+    if isinstance(output, list) and len(output) > 0:
+        item = output[0]
+        if isinstance(item, dict):
+            b64 = item.get('image_url') or ''
+            if b64:
+                try:
+                    return base64.b64decode(b64)
+                except Exception:
+                    logger.warning('anima: failed to decode base64 from image_url')
+                    return None
+        return None
+
+    # Fallback: output is a dict with 'images' key
     if isinstance(output, dict):
         images = output.get('images') or []
         if images and isinstance(images[0], str):
@@ -189,10 +203,12 @@ def generate_variation(
             except Exception:
                 return None
 
+    # Fallback: output is itself a base64 string
     if isinstance(output, str):
         try:
             return base64.b64decode(output)
         except Exception:
             return None
 
+    logger.warning(f'anima: unexpected output type: {type(output).__name__}')
     return None
