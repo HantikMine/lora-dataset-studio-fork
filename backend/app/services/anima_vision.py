@@ -30,14 +30,15 @@ _MODEL = 'google/gemma-4-31b-it'
 #   (close-up face → only head/hair/face; bust → +upper body; full body → all).
 _VLM_PROMPT = """You are an anime character profiling expert. Analyze this photo and output ONLY a JSON object. No markdown, no explanations.
 
-A downstream system injects your output into image prompts. Because different shots show different body parts (close-up face, bust, full body), you MUST split traits into EXACTLY these five fields:
+A downstream system injects your output into image prompts. Because different shots show different body parts (close-up face, bust, full body), you MUST split traits into EXACTLY these six fields:
 
 {
   "subject": "comma-separated: 1girl (or 1boy), plus age-range tag like 'teen' or 'adult' or 'mature'",
   "head": "comma-separated traits for HEAD AND FACE ONLY: hair color, hair length, hair texture (straight/wavy/curly), hair style (ponytail/bun/loose/braided), bangs, eye color, eye shape, skin tone, face shape, nose, lips, eyebrows, expression lines, makeup",
   "upper": "comma-separated traits for UPPER BODY: neck, shoulders, bust/chest size, arm build, torso build — everything from neck to waist",
   "lower": "comma-separated traits for LOWER BODY: hip width, leg build, thigh build, waist-to-hip ratio — everything from waist down",
-  "body_global": "comma-separated GLOBAL body traits: body type (slender/curvy/athletic/petite), height (tall/short), skin tone if not already in head"
+  "body_global": "comma-separated GLOBAL body traits: body type (slender/curvy/athletic/petite), height (tall/short), skin tone if not already in head",
+  "negative": "comma-separated tags of traits this character EXPLICITLY does NOT have and should NEVER appear. Look at what is ABSENT: if hair is NOT curly, add 'curly hair'. If NOT muscular, add 'muscular'. If NOT chubby, add 'chubby'. If NOT wearing glasses, add 'glasses'. If NOT male, add '1boy, male'. This prevents wrong traits in generated images."
 }
 
 CRITICAL RULES:
@@ -148,12 +149,13 @@ def describe_character(image_path: str) -> dict | None:
             logger.warning(f'anima_vision: unparseable JSON: {content[:200]}')
             return None
 
-    # Return all five categorized fields
+    # Return all six categorized fields
     subject = (result.get('subject') or '').strip()
     head = (result.get('head') or '').strip()
     upper = (result.get('upper') or '').strip()
     lower = (result.get('lower') or '').strip()
     body_global = (result.get('body_global') or '').strip()
+    negative = (result.get('negative') or '').strip()
 
     if not subject and not head:
         logger.warning('anima_vision: empty response from VLM')
@@ -161,5 +163,5 @@ def describe_character(image_path: str) -> dict | None:
 
     return {
         'subject': subject, 'head': head, 'upper': upper,
-        'lower': lower, 'body_global': body_global,
+        'lower': lower, 'body_global': body_global, 'negative': negative,
     }

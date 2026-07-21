@@ -74,8 +74,24 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
 
     identity = ', '.join(identity_parts)
 
-    # Format: identity_tags, shot_description, (negative)
-    prompt = f'{identity}, {sp}' if identity else sp
+    # Negatives from VLM — prepend at the start, one per line
+    neg_prefix = ''
+    if character_desc:
+        neg_tags = (character_desc.get('negative') or '').strip()
+        if neg_tags:
+            neg_prefix = ' '.join(
+                f'({t.strip()}:-1)' for t in neg_tags.split(',') if t.strip()
+            )
+
+    # Format: (negative:-1)... identity_tags, shot_description
+    if neg_prefix and identity:
+        prompt = f'{neg_prefix}, {identity}, {sp}'
+    elif neg_prefix:
+        prompt = f'{neg_prefix}, {sp}'
+    elif identity:
+        prompt = f'{identity}, {sp}'
+    else:
+        prompt = sp
     prompt = prompt.replace('  ', ' ').strip()
     return prompt
 
