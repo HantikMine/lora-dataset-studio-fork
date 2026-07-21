@@ -162,11 +162,12 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
   }, [generator]);
   const isNB = generator === 'nanobanana';
   const isGPT = generator === 'chatgpt';
-  const isKlein = !isNB && !isGPT;
+  const isAnima = generator === 'anima';
+  const isKlein = !isNB && !isGPT && !isAnima;
 
   // Which engines the user actually enabled in Settings (config.engines.enabled),
   // on top of the live reachability probe in `caps.engines`.
-  const [enabledEngines, setEnabledEngines] = useState(['nanobanana', 'chatgpt', 'klein']);
+  const [enabledEngines, setEnabledEngines] = useState(['nanobanana', 'chatgpt', 'klein', 'anima']);
   // ChatGPT auth lane (auto|api|subscription) — decides whether the card shows a
   // per-image API price or "uses your ChatGPT subscription quota".
   const [chatgptAuth, setChatgptAuth] = useState('auto');
@@ -185,8 +186,9 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
   }, []);
   const nbAvailable = enabledEngines.includes('nanobanana') && caps.engines.nanobanana;
   const gptAvailable = enabledEngines.includes('chatgpt') && caps.engines.chatgpt;
+  const anAvailable = enabledEngines.includes('anima') && caps.engines.anima;
   const klAvailable = enabledEngines.includes('klein') && caps.engines.klein;
-  const currentAvailable = isKlein ? klAvailable : isNB ? nbAvailable : gptAvailable;
+  const currentAvailable = isKlein ? klAvailable : isAnima ? anAvailable : isNB ? nbAvailable : gptAvailable;
 
   // The persisted generator can point at an engine that has since been
   // disabled in Settings (or lost its key/backend): auto-switch to the first
@@ -194,7 +196,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
   // regenerate, which follows the persisted selection.
   useEffect(() => {
     if (currentAvailable) return;
-    const first = nbAvailable ? 'nanobanana' : gptAvailable ? 'chatgpt' : klAvailable ? 'klein' : null;
+    const first = nbAvailable ? 'nanobanana' : gptAvailable ? 'chatgpt' : anAvailable ? 'anima' : klAvailable ? 'klein' : null;
     if (first && first !== generator) setGenerator(first);
   }, [currentAvailable, nbAvailable, gptAvailable, klAvailable, generator]);
   // Effective ChatGPT lane: the subscription (ChatGPT Plus/Pro image quota) vs the
@@ -463,7 +465,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
           where the images are made — Klein runs free on your GPU · APIs bill per image (or use your ChatGPT subscription)
         </span>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         <button type="button" onClick={() => setGenerator('klein')} aria-pressed={isKlein}
           disabled={!klAvailable || !!generating}
           title={generating ? 'A generation batch is running — wait for it to finish before switching engine' : undefined}
@@ -478,7 +480,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
             <span className="flex flex-wrap gap-1">
               <span className="px-1.5 py-px rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-[0.625rem]">Free</span>
               <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">Your GPU</span>
-              <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">NSFW OK</span>
+              <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">SFW</span>
             </span>
             {klAvailable ? (
               <span className="text-content-subtle text-[0.625rem]">Runs on this machine — slower, tunable face fidelity.</span>
@@ -539,6 +541,31 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
               </span>
             ) : (
               <span className="text-amber-300 text-[0.625rem]">⚠ Add an API key or connect a subscription in Settings</span>
+            )}
+          </span>
+        </button>
+        <button type="button" onClick={() => setGenerator('anima')} aria-pressed={isAnima}
+          disabled={!anAvailable || !!generating}
+          title={generating ? 'A generation batch is running — wait for it to finish before switching engine' : undefined}
+          className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isAnima
+            ? 'border-rose-400/60 bg-rose-500/15 ring-1 ring-rose-400/40'
+            : 'border-border bg-app/40 hover:enabled:bg-surface-raised'}`}>
+          <span className="w-9 h-9 shrink-0 grid place-items-center text-2xl" aria-hidden="true">🎨</span>
+          <span className="flex flex-col gap-1 min-w-0">
+            <span className={`text-[0.8125rem] font-semibold ${isAnima ? 'text-rose-200' : 'text-content-muted'}`}>
+              Anima <span className="font-normal text-content-subtle">· API</span>
+            </span>
+            <span className="flex flex-wrap gap-1">
+              <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">No GPU</span>
+              <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">~$0.01/image</span>
+              <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">NSFW OK</span>
+            </span>
+            {anAvailable ? (
+              <span className={`text-[0.625rem] ${isAnima ? 'text-rose-300' : 'text-content-subtle'}`}>
+                2B anime model · Danbooru tags · RunPod serverless
+              </span>
+            ) : (
+              <span className="text-amber-300 text-[0.625rem]">⚠ Add ANIMA_API_KEY in Settings</span>
             )}
           </span>
         </button>

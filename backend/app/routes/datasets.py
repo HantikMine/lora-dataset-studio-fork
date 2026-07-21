@@ -394,9 +394,9 @@ def dataset_generate(dataset_id):
     data = request.get_json(silent=True) or {}
     generator = data.get('generator') or 'klein'
     variations = data.get('variations') or []
-    # Route-level fail-closed: NSFW variations never reach an API engine — they
-    # exist only on the local Klein path (the service re-checks, defense in depth).
-    if generator in svc.API_ENGINES and any(
+    # Route-level fail-closed: NSFW variations never reach third-party API engines
+    # (Gemini/ChatGPT). Anima is the user's own endpoint — NSFW allowed.
+    if generator in ('nanobanana', 'chatgpt') and any(
             v.get('nsfw') or is_nsfw_label(v.get('label')) for v in variations):
         return jsonify({'ok': False,
                         'error': 'NSFW variations run on the local Klein engine only — '
