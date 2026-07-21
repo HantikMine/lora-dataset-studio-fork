@@ -38,13 +38,14 @@ A downstream system injects your output into image prompts. Because different sh
   "upper": "comma-separated traits for UPPER BODY: neck, shoulders, bust/chest size, arm build, torso build — everything from neck to waist",
   "lower": "comma-separated traits for LOWER BODY: hip width, leg build, thigh build, waist-to-hip ratio — everything from waist down",
   "body_global": "comma-separated GLOBAL body traits: body type (slender/curvy/athletic/petite), height (tall/short), skin tone if not already in head",
-  "negative": "comma-separated tags of PHYSICAL APPEARANCE traits this character does NOT have. Look at what is ABSENT: if hair is NOT curly, add 'curly hair'. If NOT muscular, add 'muscular build'. If NOT chubby, add 'chubby'. If NOT tall, add 'tall'. If NOT tanned, add 'tanned skin'. If NOT blue eyes, add 'blue eyes'. ONLY negate physical body traits — NEVER negate clothing, accessories, hats, glasses, jewelry, poses, expressions, or backgrounds."
+  "negative": "comma-separated tags of MAJOR physical traits this character does NOT have. ONLY list things that would fundamentally change the character's appearance: hair texture (curly/wavy if hair is straight), body build (muscular/chubby if slender), height (short/tall if opposite), gender (1boy if 1girl). DO NOT list alternative hair colors, eye colors, or skin tones — those are too specific and create contradictions. 3-8 tags max.",
+  "description": "ONE natural English sentence describing this character for image prompts. Example: A young woman with long blue hair, blue eyes, pale skin, oval face."
 }
 
 CRITICAL RULES:
 - Each field is independent — a "bust" shot will use subject+head+upper; a "full body" shot uses ALL
 - Be EXHAUSTIVE in each category. 15+ tags in head, 8+ in upper, 8+ in lower, 3+ in body_global
-- Use ONLY Danbooru tags (lowercase, underscores). NO natural-language sentences
+- Use ONLY Danbooru tags (lowercase, underscores) for tag fields
 - NEVER describe clothing, accessories, hats, glasses, jewelry — ABSOLUTELY NO CLOTHING in head/upper/lower fields. Those change per shot.
 - NEVER include expression tags (smiling/frown/grin/etc) — expression changes per shot, not permanent
 - NEVER include emotional or mood descriptors — those are NOT physical identity traits
@@ -163,5 +164,5 @@ def describe_character(image_path: str) -> dict | None:
 
     return {
         'subject': subject, 'head': head, 'upper': upper,
-        'lower': lower, 'body_global': body_global, 'negative': negative,
+        'lower': lower, 'body_global': body_global, 'negative': negative, 'description': (result.get('description') or '').strip(),
     }

@@ -120,6 +120,12 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
         parts.append(sp)
     prompt = ', '.join(parts)
     prompt = prompt.replace('  ', ' ').strip()
+    # Append natural-language description at end (anima-prompt skill: tags first, then description)
+    desc_text = ''
+    if character_desc:
+        desc_text = (character_desc.get('description') or '').strip()
+    if desc_text:
+        prompt = f'{prompt}. {desc_text}'
     return prompt
 
 
