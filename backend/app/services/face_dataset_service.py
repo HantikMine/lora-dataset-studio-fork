@@ -4765,6 +4765,21 @@ def _run_nanobanana_batch(app, items, ref_bytes, engine='nanobanana', dataset_id
     token = dataset_activity.begin(dataset_id, 'generate', total=len(items), engine=engine) \
         if dataset_id is not None else None
 
+    # Anima: resolve character description from VLM once (expensive, cached per dataset).
+    character_desc = None
+    if engine == 'anima' and dataset_id is not None:
+        ds = get_dataset(str(dataset_id))  # not LOCAL_USER — just need the object
+        if ds and ds.ref_filename:
+            ref_path = _ref_path(ds)
+            if os.path.exists(ref_path):
+                try:
+                    from .anima_vision import describe_character
+                    character_desc = describe_character(ref_path)
+                    if character_desc:
+                        logger.info(f'anima batch: VLM described character: {character_desc["tags"][:100]}...')
+                except Exception as exc:
+                    logger.warning(f'anima batch: VLM failed: {exc}')
+
     def _run_one(item):
         # item = (image_id, prompt, aspect, suffix) ; aspect optionnel (rétro-compat
         # → '1:1'), suffix optionnel (direction créative du dataset, déjà composée
@@ -4799,9 +4814,16 @@ def _run_nanobanana_batch(app, items, ref_bytes, engine='nanobanana', dataset_id
         if engine == 'chatgpt':
             gen_kwargs['force_lane'] = force_lane
         try:
-            out = api_generate(ref_bytes,
-                               wrap_variation(prompt, ref_count=n_refs, suffix=suffix),
-                               **gen_kwargs)
+            if engine == 'anima':
+                # Anima: raw Danbooru prompt, no identity guard wrapper.
+                # Character description (from VLM) enriches every shot.
+                out = api_generate(ref_bytes, prompt,
+                                   aspect_ratio=aspect,
+                                   character_desc=character_desc)
+            else:
+                out = api_generate(ref_bytes,
+                                   wrap_variation(prompt, ref_count=n_refs, suffix=suffix),
+                                   **gen_kwargs)
             if not out:
                 # api_generate signale certains refus/vides par un retour falsy
                 # sans lever — sans raison, la tuile "failed" resterait muette.
