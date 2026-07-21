@@ -196,6 +196,7 @@ def create_app(config_object=None):
         import logging
         from logging.handlers import RotatingFileHandler
         root = logging.getLogger()
+        root.setLevel(logging.INFO)
         log_path = str(data_dir / 'app.log')
         if not any(isinstance(h, RotatingFileHandler)
                    and getattr(h, 'baseFilename', '') == os.path.abspath(log_path)
@@ -204,10 +205,13 @@ def create_app(config_object=None):
                                      backupCount=2, encoding='utf-8')
             fh.setFormatter(logging.Formatter(
                 '%(asctime)s %(levelname)s %(name)s: %(message)s'))
-            fh.setLevel(logging.INFO)
             root.addHandler(fh)
-            if root.level > logging.INFO or root.level == logging.NOTSET:
-                root.setLevel(logging.INFO)
+        # Also log to console so start.bat users see what's happening
+        if not any(isinstance(h, logging.StreamHandler) for h in root.handlers):
+            sh = logging.StreamHandler()
+            sh.setFormatter(logging.Formatter('%(levelname)s %(name)s: %(message)s'))
+            sh.setLevel(logging.INFO)
+            root.addHandler(sh)
 
     # Flask-WTF looks in request.form before it checks the CSRF header.  For a
     # multipart upload that parses the body in its before_request hook, before the
