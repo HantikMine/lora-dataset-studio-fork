@@ -48,13 +48,29 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
         # Default: face / close-up / unknown → conservative, head+body
         regions = ('subject', 'head', 'body_global')
 
-    # Build identity tags from VLM, only from selected regions
+    # Build identity tags from VLM, only from selected regions.
+    # Strip expression/emotion tags — those change per shot, not permanent.
+    _expression_strip = {'smiling', 'frown', 'grin', 'smirk', 'laughing', 'crying',
+                         'angry', 'sad', 'surprised', 'blush', 'blushing', 'aroused',
+                         'annoyed', 'bored', 'confused', 'embarrassed', 'nervous',
+                         'pout', 'scared', 'serious', 'shy', 'sleepy', 'worried',
+                         'expressionless', 'closed_mouth', 'open_mouth', 'parted_lips',
+                         'teeth', 'tongue', 'tongue_out', 'light_smile', 'slight_smile',
+                         'fake_smile', 'forced_smile', 'seductive_smile', 'evil_smile',
+                         'naughty_face', 'looking_at_viewer', 'looking_away',
+                         'looking_back', 'looking_up', 'looking_down', 'looking_to_the_side'}
     identity_parts = []
     if character_desc:
         for region in regions:
             v = (character_desc.get(region) or '').strip()
             if v:
-                identity_parts.append(v)
+                # Filter out expression/emotion tags from identity
+                filtered = ', '.join(
+                    t.strip() for t in v.split(',')
+                    if t.strip().lower() not in _expression_strip
+                )
+                if filtered:
+                    identity_parts.append(filtered)
 
     identity = ', '.join(identity_parts)
 
