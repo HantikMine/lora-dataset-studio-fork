@@ -88,12 +88,7 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
                     if any(c in tl for c in _clothing_strip):
                         continue
                     filtered_tags.append(t)
-                # Emphasize key identity traits: wrap in (tag:1.3) for stronger adherence
-                weighted = ', '.join(
-                    f'({t}:1.3)' if not t.startswith('(') else t
-                    for t in filtered_tags
-                )
-                filtered = weighted
+                filtered = ', '.join(filtered_tags)
                 if filtered:
                     identity_parts.append(filtered)
 
@@ -112,17 +107,18 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
                 t = _re.sub(r'\s*\(.*?\)\s*', '', t).strip()
                 if t:
                     neg_list.append(t)
-            neg_prefix = ' '.join(f'({t}:-1)' for t in neg_list)
+            neg_prefix = ', '.join(neg_list) + ',' if neg_list else ''
 
-    # Format: (negative:-1)... identity_tags, shot_description
-    if neg_prefix and identity:
-        prompt = f'{neg_prefix}, {identity}, {sp}'
-    elif neg_prefix:
-        prompt = f'{neg_prefix}, {sp}'
-    elif identity:
-        prompt = f'{identity}, {sp}'
-    else:
-        prompt = sp
+    # Format: negatives, identity_tags, shot_description
+    # No weight parentheses — they break Anima
+    parts = []
+    if neg_prefix:
+        parts.append(neg_prefix.rstrip(','))
+    if identity:
+        parts.append(identity)
+    if sp:
+        parts.append(sp)
+    prompt = ', '.join(parts)
     prompt = prompt.replace('  ', ' ').strip()
     return prompt
 
@@ -159,9 +155,6 @@ def generate_variation(
     quality_mode = os.environ.get('ANIMA_QUALITY', '').lower() in ('1', 'true', 'yes')
 
     full_prompt = build_anima_prompt(prompt, character_desc)
-
-    # Anti-dupe: prevent multiple copies of the same character
-    full_prompt = f'{full_prompt}, (multiple_girls:-1)'
 
     input_payload = {
         'prompt': full_prompt,
