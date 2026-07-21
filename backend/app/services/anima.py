@@ -73,6 +73,7 @@ def generate_variation(
     """
     key = _api_key()
     if not key:
+        print('[anima] ANIMA_API_KEY missing', flush=True)
         logger.warning('anima: ANIMA_API_KEY missing')
         return None
 
@@ -122,6 +123,7 @@ def generate_variation(
     }
 
     try:
+        print(f'[anima] prompt ({len(full_prompt)} chars): {full_prompt[:300]}...', flush=True)
         logger.info(f'anima: prompt ({len(full_prompt)} chars): {full_prompt[:300]}...')
         r = requests.post(
             _ANIMA_ENDPOINT, headers=headers, json={'input': input_payload},
@@ -132,6 +134,7 @@ def generate_variation(
         return None
 
     if r.status_code != 200:
+        print(f'[anima] HTTP {r.status_code}: {r.text[:200]}', flush=True)
         logger.warning(f'anima: HTTP {r.status_code}: {r.text[:300]}')
         return None
 
