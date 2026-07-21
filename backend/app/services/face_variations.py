@@ -222,10 +222,8 @@ def wrap_variation_klein(prompt: str, nsfw: bool = False, framing: str | None = 
 #     CONCRÈTE mais variée (les modèles d'édition suivent mieux une consigne « porte X »
 #     qu'un vide qu'ils comblent par la réf). Baker la directive dans le TEXTE du prompt
 #     la propage partout (API + Klein + persistance variation_prompt + régénération).
-OUTFIT_VARY = ('wearing a different casual everyday outfit, varied in style and colour '
-               '(not the outfit from the reference image)')
-EXPRESSION_NEUTRAL = ('a calm neutral facial expression, not copying the expression from '
-                      'the reference image')
+OUTFIT_VARY = ('wearing a different casual everyday outfit, varied in style and colour')
+EXPRESSION_NEUTRAL = ('a calm neutral facial expression')
 
 # Détecteurs « le texte nomme-t-il DÉJÀ une tenue / une expression ? » (mots entiers).
 # Servent à n'ajouter la directive par défaut qu'aux entrées qui n'en portent pas —
@@ -314,7 +312,7 @@ VARIATION_CATALOG = [
     _e('face_look_down', 'angle', 'face', 'Face, looking down',
        'close-up portrait, looking slightly downward, pensive, indoor blurred background', cb=True),
     _e('bust_front', 'framing', 'bust', 'Bust, front',
-       'upper body portrait, front view, neutral, wearing a casual top different from the reference outfit',
+        'upper body portrait, front view, neutral, wearing a casual top',
        co=True, cb=True),
     _e('bust_34', 'framing', 'bust', 'Bust, three-quarter',
        'upper body portrait, three-quarter view, smiling, different outfit, indoor', co=True, cb=True),
@@ -323,13 +321,13 @@ VARIATION_CATALOG = [
     _e('bust_studio', 'background', 'bust', 'Bust, studio',
        'upper body portrait, three-quarter view, studio backdrop', cb=True),
     _e('bust_jacket', 'outfit', 'bust', 'Bust, jacket',
-       'upper body portrait, wearing a jacket different from the reference outfit, urban background',
+       'upper body portrait, wearing a jacket, urban background',
        co=True, cb=True),
     _e('bust_evening', 'outfit', 'bust', 'Bust, evening outfit',
-       'upper body portrait, elegant evening look, different from the reference outfit, dim ambient light',
+       'upper body portrait, elegant evening look, dim ambient light',
        co=True, cb=True),
     _e('body_stand_front', 'framing', 'body', 'Body standing, front',
-       'full body shot, standing, front view, casual clothes different from the reference outfit, street',
+       'full body shot, standing, front view, casual clothes, street',
        co=True, cb=True),
     _e('body_stand_34', 'framing', 'body', 'Body standing, three-quarter',
        'full body shot, standing, three-quarter view, different outfit, outdoor', co=True, cb=True),
@@ -340,7 +338,7 @@ VARIATION_CATALOG = [
     _e('body_cafe', 'background', 'body', 'Body, café',
        'full body shot, standing in a cafe, warm light', co=True, cb=True),
     _e('body_beach', 'background', 'body', 'Body, beach (clothed)',
-       'full body shot, standing on a beach, summer casual clothes different from the reference outfit, daylight',
+       'full body shot, standing on a beach, summer casual clothes, daylight',
        co=True, cb=True),
     _e('back_34', 'framing', 'back', 'Back, three-quarter',
        'full body shot, three-quarter back view, showing hairstyle and silhouette', co=True, cb=True),
