@@ -4769,17 +4769,18 @@ def _run_nanobanana_batch(app, items, ref_bytes, engine='nanobanana', dataset_id
     character_desc = None
     if engine == 'anima' and dataset_id is not None:
         from .. import config as _cfg
-        ds = get_dataset(_cfg.LOCAL_USER, str(dataset_id))
-        if ds and ds.ref_filename:
-            ref_path = _ref_path(ds)
-            if os.path.exists(ref_path):
-                try:
-                    from .anima_vision import describe_character
-                    character_desc = describe_character(ref_path)
-                    if character_desc:
-                        logger.info(f'anima batch: VLM described character: {character_desc["tags"][:100]}...')
-                except Exception as exc:
-                    logger.warning(f'anima batch: VLM failed: {exc}')
+        with app.app_context():
+            ds = get_dataset(_cfg.LOCAL_USER, str(dataset_id))
+            if ds and ds.ref_filename:
+                ref_path = _ref_path(ds)
+                if os.path.exists(ref_path):
+                    try:
+                        from .anima_vision import describe_character
+                        character_desc = describe_character(ref_path)
+                        if character_desc:
+                            logger.info(f'anima batch: VLM described character: {character_desc["tags"][:100]}...')
+                    except Exception as exc:
+                        logger.warning(f'anima batch: VLM failed: {exc}')
 
     def _run_one(item):
         # item = (image_id, prompt, aspect, suffix) ; aspect optionnel (rétro-compat
