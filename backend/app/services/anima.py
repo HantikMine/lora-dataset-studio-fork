@@ -196,8 +196,19 @@ def generate_variation(
     }
 
     try:
-        print(f'[anima] prompt ({len(full_prompt)} chars):\n{full_prompt}', flush=True)
-        logger.info(f'anima: prompt ({len(full_prompt)} chars): {full_prompt[:300]}...')
+        # Structured log: show what comes from VLM vs from the shot catalog
+        if character_desc:
+            neg = (character_desc.get('negative') or '').strip()
+            desc_text = (character_desc.get('description') or '').strip()
+            print(f'[anima] VLM negative:  {neg or "(none)"}')
+            print(f'[anima] VLM identity:  {build_anima_prompt("", character_desc)}')
+            if desc_text:
+                print(f'[anima] VLM desc:      {desc_text}')
+            print(f'[anima] SHOT catalog:   {prompt}')
+            print(f'[anima] COMBINED ({len(full_prompt)} chars):', flush=True)
+        else:
+            print(f'[anima] prompt ({len(full_prompt)} chars):', flush=True)
+        print(full_prompt)
         r = requests.post(
             _ANIMA_ENDPOINT, headers=headers, json={'input': input_payload},
             timeout=(10, 180),
