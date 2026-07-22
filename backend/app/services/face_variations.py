@@ -45,7 +45,7 @@ IDENTITY_GUARD_KLEIN = (
     "Keep the facial identity exactly the same: same eye shape and color, nose, "
     "jawline, lips, skin tone and texture, and face proportions. Do not beautify "
     "or alter the face. Sharp focus, natural skin texture with visible pores, "
-    "realistic lighting with soft shadows, high detail.")
+    "soft shadows, high detail.")
 
 # Fixed instruction for the manual "Klein upscale & improve" action. Lives here
 # (not in face_dataset_service) so all four editable identity/quality prompts share
@@ -199,10 +199,10 @@ def wrap_variation_klein(prompt: str, nsfw: bool = False, framing: str | None = 
     byte-identical output."""
     detail = _KLEIN_FRAMING_DETAIL.get(framing or '', '')
     ending = ("Explicit nudity is allowed; render natural, anatomically correct forms. "
-              "Professional realistic photograph.") if nsfw else \
-             "Professional realistic photograph, SFW."
+              "High-quality image.") if nsfw else \
+             "High-quality image, SFW."
     return (
-        f"Create a new photograph of the same person as the reference image: {_append_suffix(prompt, suffix)}. "
+        f"Create a new image of the same person as the reference: {_append_suffix(prompt, suffix)}. "
         + (f"{detail} " if detail else "")
         + f"{get_identity_prompt('klein_identity')} {ending}")
 
