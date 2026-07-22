@@ -21,7 +21,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 _OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-_MODEL = 'google/gemma-4-31b-it'
+_MODEL = 'google/gemini-3.1-pro-preview'
 
 # ── VLM Prompt ─────────────────────────────────────────────────────────────
 _VLM_PROMPT = """You are an anime character profiling expert. Analyze this photo and output ONLY a JSON object. No markdown, no explanations.
@@ -80,7 +80,6 @@ def describe_character(image_path: str) -> dict | None:
                 {'type': 'text', 'text': _VLM_PROMPT},
             ],
         }],
-        'provider': {'order': ['Friendli'], 'allow_fallbacks': False},
         'response_format': {'type': 'json_object'},
         'max_tokens': 800,
     }
