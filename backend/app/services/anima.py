@@ -23,110 +23,52 @@ def _api_key() -> str:
 
 
 def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> str:
-    """Build an Anima prompt by injecting ONLY the body-region traits relevant
-    to the shot's framing.
+    """Build an Anima prompt: identity tags (filtered by framing) + shot description.
 
-    The VLM returns categorized fields:
-      subject, head, upper, lower, body_global
-
-    Framing detection (from shot_prompt text):
-      face/close-up → subject + head + body_global
-      bust/upper body → subject + head + upper + body_global
-      full body → all fields
-      back → head + body_global (no face)
-      unknown → subject + head + body_global (safe default)
+    VLM fields: subject, head, upper, lower, body_global, description.
+    Only the fields relevant to the shot's framing are injected.
+    No negatives, no weight parentheses.
     """
     sp = (shot_prompt or '').strip()
     sp_lower = sp.lower()
 
-    # Detect framing from keywords in the shot prompt
+    # Detect framing
     if any(w in sp_lower for w in ('full body', 'standing', 'full-body', 'feet', 'kneeling', 'sitting')):
         regions = ('subject', 'head', 'upper', 'lower', 'body_global')
     elif any(w in sp_lower for w in ('bust', 'upper body', 'upper-body', 'waist')):
         regions = ('subject', 'head', 'upper', 'body_global')
     else:
-        # Default: face / close-up / unknown → conservative, head+body
         regions = ('subject', 'head', 'body_global')
 
-    # Build identity tags from VLM, only from selected regions.
-    # Strip expression/emotion tags — those change per shot, not permanent.
-    _expression_strip = {'smiling', 'frown', 'grin', 'smirk', 'laughing', 'crying',
-                         'angry', 'sad', 'surprised', 'blush', 'blushing', 'aroused',
-                         'annoyed', 'bored', 'confused', 'embarrassed', 'nervous',
-                         'pout', 'scared', 'serious', 'shy', 'sleepy', 'worried',
-                         'expressionless', 'closed_mouth', 'open_mouth', 'parted_lips',
-                         'teeth', 'tongue', 'tongue_out', 'light_smile', 'slight_smile',
-                         'fake_smile', 'forced_smile', 'seductive_smile', 'evil_smile',
-                         'naughty_face', 'looking_at_viewer', 'looking_away',
-                         'looking_back', 'looking_up', 'looking_down', 'looking_to_the_side'}
-    # Also strip clothing/accessories that VLM might leak into identity fields
-    _clothing_strip = {'bra', 'lace', 'panties', 'underwear', 'robe', 'shawl', 'fur_stole',
-                       'necklace', 'bracelet', 'ring', 'earring', 'earrings', 'necklace',
-                       'hat', 'straw_hat', 'baseball_cap', 'beanie', 'beret', 'cap',
-                       'sunglasses', 'glasses', 'headband', 'ribbon', 'hair_ribbon',
-                       'bow', 'hair_bow', 'bow_tie', 'tie', 'scarf', 'belt', 'watch',
-                       'choker', 'anklet', 'stockings', 'socks', 'tights', 'pantyhose',
-                       'shoes', 'boots', 'heels', 'sandals', 'sneakers', 'bikini',
-                       'swimsuit', 'dress', 't-shirt', 'shirt', 'blouse', 'jacket',
-                       'coat', 'hoodie', 'sweater', 'cardigan', 'skirt', 'shorts',
-                       'pants', 'jeans', 'leggings', 'swimwear', 'bodysuit', 'corset',
-                       'leotard', 'tank_top', 'crop_top', 'camisole'}
-    identity_parts = []
+    # Expression tags to strip (they change per shot, not permanent identity)
+    _expr_strip = {'smiling', 'frown', 'grin', 'smirk', 'laughing', 'crying', 'angry', 'sad',
+                   'surprised', 'blush', 'blushing', 'closed_mouth', 'open_mouth', 'parted_lips',
+                   'teeth', 'tongue', 'tongue_out', 'looking_at_viewer', 'looking_away'}
+
+    # Build identity from selected regions, strip expression tags
+    identity = []
     if character_desc:
         for region in regions:
             v = (character_desc.get(region) or '').strip()
             if v:
-                # Filter out expression + clothing tags from identity
-                _strip = _expression_strip | _clothing_strip
-                filtered_tags = []
-                for t in v.split(','):
-                    t = t.strip()
-                    tl = t.lower()
-                    # Exact match OR tag contains a clothing keyword
-                    if tl in _strip:
-                        continue
-                    if any(c in tl for c in _clothing_strip):
-                        continue
-                    filtered_tags.append(t)
-                filtered = ', '.join(filtered_tags)
+                filtered = [t.strip() for t in v.split(',')
+                           if t.strip() and t.strip().lower() not in _expr_strip]
                 if filtered:
-                    identity_parts.append(filtered)
+                    identity.append(', '.join(filtered))
 
-    identity = ', '.join(identity_parts)
+    identity_str = ', '.join(identity)
 
-    # Negatives from VLM — prepend at the start, one per line
-    neg_prefix = ''
-    if character_desc:
-        neg_tags = (character_desc.get('negative') or '').strip()
-        if neg_tags:
-            # Clean each tag: remove parenthesized clarifications like "glasses (worn on face)"
-            # Do NOT filter clothing from negatives — they're SUPPOSED to be there
-            import re as _re
-            neg_list = []
-            for t in neg_tags.split(','):
-                t = _re.sub(r'\s*\(.*?\)\s*', '', t).strip()
-                # Strip gender/1boy/1girl from negatives — redundant, already in subject
-                if t and t.lower() not in ('1boy', '1girl', 'male', 'female'):
-                    neg_list.append(t)
-            neg_prefix = ', '.join(neg_list) + ',' if neg_list else ''
-
-    # Format: negatives, identity_tags, shot_description
-    # No weight parentheses — they break Anima
-    parts = []
-    if neg_prefix:
-        parts.append(neg_prefix.rstrip(','))
-    if identity:
-        parts.append(identity)
-    if sp:
-        parts.append(sp)
+    # Build: identity, shot_description. No negatives.
+    parts = [p for p in [identity_str, sp] if p]
     prompt = ', '.join(parts)
     prompt = prompt.replace('  ', ' ').strip()
-    # Append natural-language description at end (anima-prompt skill: tags first, then description)
-    desc_text = ''
+
+    # Append natural-language description at end
     if character_desc:
-        desc_text = (character_desc.get('description') or '').strip()
-    if desc_text:
-        prompt = f'{prompt}. {desc_text}'
+        desc = (character_desc.get('description') or '').strip()
+        if desc:
+            prompt = f'{prompt}. {desc}'
+
     return prompt
 
 
@@ -198,9 +140,7 @@ def generate_variation(
     try:
         # Structured log: show what comes from VLM vs from the shot catalog
         if character_desc:
-            neg = (character_desc.get('negative') or '').strip()
             desc_text = (character_desc.get('description') or '').strip()
-            print(f'[anima] VLM negative:  {neg or "(none)"}')
             print(f'[anima] VLM identity:  {build_anima_prompt("", character_desc)}')
             if desc_text:
                 print(f'[anima] VLM desc:      {desc_text}')

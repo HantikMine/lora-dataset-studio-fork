@@ -4822,7 +4822,7 @@ def _run_nanobanana_batch(app, items, ref_bytes, engine='nanobanana', dataset_id
                 # Apply suffix (creative direction) directly to the prompt.
                 ap = prompt
                 if suffix and suffix.strip():
-                    ap = f'{prompt}, {suffix.strip()}'
+                    ap = f'{suffix.strip()}, {prompt}'
                 out = api_generate(ref_bytes, ap,
                                    aspect_ratio=aspect,
                                    character_desc=character_desc)

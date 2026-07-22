@@ -2,11 +2,11 @@
 language description from a reference photo via OpenRouter (Gemma 31B, Friendli).
 
 Used by the Anima engine to inject character identity into every shot prompt:
-  1. reference photo → Gemma VLM → {tags, description}
-  2. {tags, description} + shot prompt → RunPod endpoint
+  1. reference photo → Gemma VLM → {subject, head, upper, lower, body_global, description}
+  2. identity tags + description + shot prompt → RunPod endpoint
 
-The VLM output is cached per dataset (FaceDataset.anima_character_desc) so the
-expensive vision call happens once, not per shot.
+The VLM output is cached per dataset (FaceDataset) so the expensive vision call
+happens once per batch, not per shot.
 """
 
 from __future__ import annotations
@@ -24,39 +24,33 @@ _OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 _MODEL = 'google/gemma-4-31b-it'
 
 # ── VLM Prompt ─────────────────────────────────────────────────────────────
-# The model must output ONLY valid JSON with two fields:
-#   Each field is comma-separated Danbooru tags.
-#   The code below then selects which fields to inject based on the shot's framing
-#   (close-up face → only head/hair/face; bust → +upper body; full body → all).
 _VLM_PROMPT = """You are an anime character profiling expert. Analyze this photo and output ONLY a JSON object. No markdown, no explanations.
 
-A downstream system injects your output into image prompts. Because different shots show different body parts (close-up face, bust, full body), you MUST split traits into EXACTLY these six fields:
+A downstream system injects your output into image prompts. Split traits into these five fields:
 
 {
   "subject": "comma-separated: 1girl (or 1boy), plus age-range tag like 'teen' or 'adult' or 'mature'",
-  "head": "comma-separated traits for HEAD AND FACE ONLY: hair color, hair length, hair texture (straight/wavy/curly), hair style (ponytail/bun/loose/braided), bangs, eye color, eye shape, skin tone, face shape, nose, lips, eyebrows, expression lines, makeup",
-  "upper": "comma-separated traits for UPPER BODY: neck, shoulders, bust/chest size, arm build, torso build — everything from neck to waist",
-  "lower": "comma-separated traits for LOWER BODY: hip width, leg build, thigh build, waist-to-hip ratio — everything from waist down",
-  "body_global": "comma-separated GLOBAL body traits: body type (slender/curvy/athletic/petite), height (tall/short), skin tone if not already in head",
-  "negative": "comma-separated tags of MAJOR physical traits this character does NOT have. ONLY list things that would fundamentally change the character's appearance: hair texture (curly/wavy if hair is straight), body build (muscular/chubby if slender), height (short/tall if opposite), gender (1boy if 1girl). DO NOT list alternative hair colors, eye colors, or skin tones — those are too specific and create contradictions. 3-8 tags max.",
-  "description": "ONE natural English sentence describing this character for image prompts. Example: A young woman with long blue hair, blue eyes, pale skin, oval face."
+  "head": "comma-separated Danbooru tags for HEAD AND FACE ONLY: hair color, hair length, hair texture, hair style, bangs, eye color, eye shape, skin tone, face shape, nose, lips, eyebrows",
+  "upper": "comma-separated Danbooru tags for UPPER BODY: neck, shoulders, bust/chest size, arm build, torso build — neck to waist",
+  "lower": "comma-separated Danbooru tags for LOWER BODY: hip width, leg build, thigh build, waist-to-hip ratio — waist down",
+  "body_global": "comma-separated Danbooru tags for GLOBAL body traits: body type, height, skin tone if not in head",
+  "description": "ONE natural English sentence describing this character. Example: A young woman with long blue hair, blue eyes, pale skin."
 }
 
 CRITICAL RULES:
-- Each field is independent — a "bust" shot will use subject+head+upper; a "full body" shot uses ALL
-- Be EXHAUSTIVE in each category. 15+ tags in head, 8+ in upper, 8+ in lower, 3+ in body_global
+- Each field is independent — a "bust" shot uses subject+head+upper; a "full body" shot uses ALL
+- Describe ONLY what you can SEE in the photo. Do NOT invent or guess unknown traits
 - Use ONLY Danbooru tags (lowercase, underscores) for tag fields
-- NEVER describe clothing, accessories, hats, glasses, jewelry — ABSOLUTELY NO CLOTHING in head/upper/lower fields. Those change per shot.
-- NEVER include expression tags (smiling/frown/grin/etc) — expression changes per shot, not permanent
-- NEVER include expression tags, mood descriptors, or gender tags (1boy/1girl) — those are NOT for negatives.
-- Output ONLY the JSON object"""
+- NEVER include clothing, accessories, hats, glasses, jewelry — those change per shot
+- NEVER include expression tags (smiling/frown/etc) — expression changes per shot
+- Output ONLY the JSON object, nothing else"""
 
 
 def describe_character(image_path: str) -> dict | None:
-    """Send reference photo to Gemma VLM, return {'tags': ..., 'description': ...}.
+    """Send reference photo to Gemma VLM, return categorized character traits.
 
-    Returns None when OpenRouter is unreachable, the key is missing, or the
-    response can't be parsed.
+    Returns dict with keys: subject, head, upper, lower, body_global, description
+    Returns None when OpenRouter is unreachable, key is missing, or parsing fails.
     """
     key = os.environ.get('OPENROUTER_API_KEY', '').strip()
     if not key:
@@ -71,15 +65,11 @@ def describe_character(image_path: str) -> dict | None:
         logger.warning(f'anima_vision: cannot read {image_path}: {exc}')
         return None
 
-    # Detect MIME type from extension
     ext = os.path.splitext(image_path)[1].lower()
     mime = {'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
             'webp': 'image/webp'}.get(ext.lstrip('.'), 'image/webp')
 
-    headers = {
-        'Authorization': f'Bearer {key}',
-        'Content-Type': 'application/json',
-    }
+    headers = {'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'}
 
     payload = {
         'model': _MODEL,
@@ -90,21 +80,15 @@ def describe_character(image_path: str) -> dict | None:
                 {'type': 'text', 'text': _VLM_PROMPT},
             ],
         }],
-        'provider': {
-            'order': ['Friendli'],
-            'allow_fallbacks': False,
-        },
+        'provider': {'order': ['Friendli'], 'allow_fallbacks': False},
         'response_format': {'type': 'json_object'},
         'max_tokens': 800,
     }
 
-    # Three attempts with backoff — OpenRouter can 503 transiently
     for attempt in range(3):
         try:
-            r = requests.post(
-                _OPENROUTER_URL, headers=headers, json=payload,
-                timeout=(10, 60),
-            )
+            r = requests.post(_OPENROUTER_URL, headers=headers, json=payload,
+                            timeout=(10, 60))
         except requests.RequestException as exc:
             logger.warning(f'anima_vision: request error (attempt {attempt+1}): {exc}')
             time.sleep(2 ** attempt)
@@ -119,9 +103,8 @@ def describe_character(image_path: str) -> dict | None:
         if attempt < 2:
             time.sleep(2 ** attempt)
     else:
-        return None  # all attempts failed
+        return None
 
-    # Parse
     try:
         body = r.json()
         content = body['choices'][0]['message']['content']
@@ -129,7 +112,6 @@ def describe_character(image_path: str) -> dict | None:
         logger.warning(f'anima_vision: bad response structure: {exc}')
         return None
 
-    # Strip markdown fences that OpenRouter sometimes injects
     content = content.strip()
     if content.startswith('```'):
         content = content.split('\n', 1)[-1]
@@ -139,7 +121,6 @@ def describe_character(image_path: str) -> dict | None:
     try:
         result = json.loads(content)
     except json.JSONDecodeError:
-        # Sometimes the model wraps JSON in quotes — try stripping outer quotes
         if content.startswith('"') and content.endswith('"'):
             try:
                 result = json.loads(json.loads(content))
@@ -150,13 +131,12 @@ def describe_character(image_path: str) -> dict | None:
             logger.warning(f'anima_vision: unparseable JSON: {content[:200]}')
             return None
 
-    # Return all six categorized fields
     subject = (result.get('subject') or '').strip()
     head = (result.get('head') or '').strip()
     upper = (result.get('upper') or '').strip()
     lower = (result.get('lower') or '').strip()
     body_global = (result.get('body_global') or '').strip()
-    negative = (result.get('negative') or '').strip()
+    description = (result.get('description') or '').strip()
 
     if not subject and not head:
         logger.warning('anima_vision: empty response from VLM')
@@ -164,5 +144,5 @@ def describe_character(image_path: str) -> dict | None:
 
     return {
         'subject': subject, 'head': head, 'upper': upper,
-        'lower': lower, 'body_global': body_global, 'negative': negative, 'description': (result.get('description') or '').strip(),
+        'lower': lower, 'body_global': body_global, 'description': description,
     }
