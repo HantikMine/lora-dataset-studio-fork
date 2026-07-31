@@ -78,6 +78,13 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None,
     prompt = ', '.join(parts)
     prompt = prompt.replace('  ', ' ').strip()
 
+    # Style anchor: @akipeko must ALWAYS be present — without it Anima renders
+    # in its default style and the art-style mismatch tanks every similarity
+    # score (lab: 2.3/10 without vs 6/10 with). Skip if already in the shot
+    # text (e.g. the user typed it in the suffix).
+    if '@akipeko' not in prompt.lower():
+        prompt = f'@akipeko, {prompt}'
+
     # Append natural-language description at end
     if character_desc:
         desc = (character_desc.get('description') or '').strip()
