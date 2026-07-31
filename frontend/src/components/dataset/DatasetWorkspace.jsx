@@ -904,6 +904,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     <VariationCatalog key={`vc-${d.id}-${bodyFid}`} busy={ds.busy}
                       datasetId={d.id}
                       refNonce={d.refNonce || ''}
+                      refFilename={d.ref_filename || ''}
                       generating={act && act.kind === 'generate' ? act : null}
                       onGenerate={(...args) => {
                         // Guard-rail: a batch is already in flight — launching another one

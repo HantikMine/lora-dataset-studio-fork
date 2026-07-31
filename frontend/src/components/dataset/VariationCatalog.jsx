@@ -5,6 +5,7 @@ import { useToast } from '../common/Toast';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import { apiFetch, postJson, postForm } from '../../api/fetchClient';
 import ShotIllustration, { contextEmoji } from './ShotIllustration';
+import ImageCompareSlider from './ImageCompareSlider';
 import { displayLabel } from '../../utils/labels';
 import { kleinMissingLabels } from '../../hooks/useSetupSteps';
 import { generationLoraPresetPayload, sanitizeGenerationLoraPresets } from '../../utils/generationLoras';
@@ -87,7 +88,7 @@ function GpuIcon({ className }) {
   );
 }
 
-export default function VariationCatalog({ onGenerate, busy, generating = null, hasRef, composition, images = [], bodyFidelity = false, promptSuffix = '', promptSuffixes = null, onSaveSuffixes = null, datasetId = null, refNonce = '' }) {
+export default function VariationCatalog({ onGenerate, busy, generating = null, hasRef, composition, images = [], bodyFidelity = false, promptSuffix = '', promptSuffixes = null, onSaveSuffixes = null, datasetId = null, refNonce = '', refFilename = '' }) {
   const toast = useToast();
   const { caps } = useCapabilities();
   // Anima Prompt panel: build the full prompt from VLM + selection, then
@@ -648,11 +649,18 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
             className="w-full rounded-md border border-border bg-app/70 p-2 font-mono text-[0.6875rem] text-content leading-relaxed focus:outline-none focus:ring-1 focus:ring-rose-400/40" />
           {animaResult && (
             <div className="flex items-center gap-3 rounded-md border border-border bg-app/50 p-2">
-              <img src={`data:image/webp;base64,${animaResult.image}`} alt="Generated Anima image"
-                className="h-24 w-24 rounded object-cover border border-border" />
+              {refFilename ? (
+                <ImageCompareSlider
+                  referenceSrc={`/api/dataset/${datasetId}/img/${encodeURIComponent(refFilename)}${refNonce ? `?v=${refNonce}` : ''}`}
+                  generatedSrc={`data:image/webp;base64,${animaResult.image}`} />
+              ) : (
+                <img src={`data:image/webp;base64,${animaResult.image}`} alt="Generated Anima image"
+                  className="h-24 w-24 rounded object-cover border border-border" />
+              )}
               <div className="flex flex-col gap-1.5">
                 <span className="text-[0.6875rem] text-content-subtle">
                   Generated {animaResult.filename}
+                  {refFilename ? ' — drag the divider to compare with the reference' : ''}
                 </span>
                 <button type="button" onClick={saveAnimaAsRef}
                   className="self-start rounded-md border border-emerald-400/40 bg-emerald-500/10 px-2 py-1 text-[0.625rem] font-semibold text-emerald-200 hover:bg-emerald-500/20">
