@@ -1303,3 +1303,78 @@ def index_config():
         'krea_samplers': KREA_ALLOWED_SAMPLERS,
         'krea_schedulers': KREA_ALLOWED_SCHEDULERS,
     })
+
+
+@bp.post('/dataset/<int:dataset_id>/anima-prompt')
+def dataset_anima_prompt(dataset_id):
+    """Build the full Anima prompt(s) for the dataset reference: VLM describes
+    the character once, then build_anima_prompt assembles identity tags + shot
+    description + natural-language tail for each requested shot.
+
+    Body: {"shots": [{"prompt": "...", "aspect": "1:1", "suffix": ""}, ...]}
+    Response: {"ok": true, "prompts": ["...", ...]}
+    """
+    ds = svc.get_dataset(LOCAL_USER, dataset_id)
+    if not ds:
+        return jsonify({'error': 'not found'}), 404
+    if not ds.ref_filename:
+        return jsonify({'error': 'set a reference photo first'}), 400
+
+    data = request.get_json(silent=True) or {}
+    shots = data.get('shots') or [{'prompt': ''}]
+
+    # VLM describe the reference once for the whole request
+    from ..services.anima_vision import describe_character
+    from ..services.anima import build_anima_prompt
+    ref_path = svc._ref_path(ds)
+    if not os.path.exists(ref_path):
+        return jsonify({'error': 'reference file missing on disk'}), 404
+    character_desc = describe_character(ref_path)
+
+    prompts = []
+    for shot in shots:
+        sp = (shot.get('prompt') or '').strip()
+        suffix = (shot.get('suffix') or '').strip()
+        # Suffix goes at the START of the shot description (Anima convention)
+        if suffix:
+            sp = f'{suffix}, {sp}' if sp else suffix
+        prompts.append(build_anima_prompt(sp, character_desc))
+
+    return jsonify({'ok': True, 'prompts': prompts})
+
+
+@bp.post('/dataset/<int:dataset_id>/anima-generate')
+def dataset_anima_generate(dataset_id):
+    """Generate ONE image from a custom prompt via the Anima endpoint.
+
+    Body: {"prompt": "...", "aspect": "1:1"}
+    Response: {"ok": true, "image": "<base64 webp>", "filename": "..."}
+    The image is saved into the dataset folder (NOT as a variation row) so the
+    user can promote it to reference or reuse it in the dataset.
+    """
+    ds = svc.get_dataset(LOCAL_USER, dataset_id)
+    if not ds:
+        return jsonify({'error': 'not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    prompt = (data.get('prompt') or '').strip()
+    if not prompt:
+        return jsonify({'error': 'prompt is required'}), 400
+    aspect = data.get('aspect') or '1:1'
+
+    from ..services.anima import generate_variation
+    out = generate_variation(b'', prompt, aspect_ratio=aspect)
+    if not out:
+        return jsonify({'error': 'Anima generation failed — check the server log'}), 502
+
+    dsdir = ensure_dataset_dir(dataset_id)
+    fn = f'{LOCAL_USER}_animacustom_{uuid.uuid4().hex[:8]}.webp'
+    with open(os.path.join(dsdir, fn), 'wb') as fh:
+        fh.write(svc.normalize_to_webp(out))
+
+    import base64 as _b64
+    return jsonify({
+        'ok': True,
+        'image': _b64.b64encode(svc.normalize_to_webp(out)).decode('ascii'),
+        'filename': fn,
+    })

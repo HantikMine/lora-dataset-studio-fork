@@ -22,12 +22,18 @@ def _api_key() -> str:
     return os.environ.get('ANIMA_API_KEY', '')
 
 
-def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> str:
+def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None,
+                       weight: float = 1.2) -> str:
     """Build an Anima prompt: identity tags (filtered by framing) + shot description.
 
     VLM fields: subject, head, upper, lower, body_global, description.
     Only the fields relevant to the shot's framing are injected.
-    No negatives, no weight parentheses.
+
+    ``weight`` (default 1.2, tuned via anima_prompt_lab.py): wraps EACH identity
+    tag in its own (tag:weight) pair. Tested across runs — 1.2 lifts eye/skin
+    fidelity without breaking face/hair; 1.3 starts to distort the face. This is
+    a GENERAL rule that helps trait adherence for any reference, not an
+    image-specific hack.
     """
     sp = (shot_prompt or '').strip()
     sp_lower = sp.lower()
@@ -56,9 +62,18 @@ def build_anima_prompt(shot_prompt: str, character_desc: dict | None = None) -> 
                 if filtered:
                     identity.append(', '.join(filtered))
 
-    identity_str = ', '.join(identity)
+    # Weight each identity tag individually: (tag:1.2) — stronger trait adherence.
+    # Tuned in anima_prompt_lab.py: 1.2 best across runs (eyes 5→6, skin→9);
+    # 1.3 distorts face; no-weight under-follows eyes/face.
+    def _weighted(tag_str: str) -> str:
+        tags = [t.strip() for t in tag_str.split(',') if t.strip()]
+        if weight and weight != 1.0:
+            return ', '.join(f'({t}:{weight})' for t in tags)
+        return tag_str
 
-    # Build: identity, shot_description. No negatives.
+    identity_str = ', '.join(_weighted(s) for s in identity if s)
+
+    # Build: identity, shot_description.
     parts = [p for p in [identity_str, sp] if p]
     prompt = ', '.join(parts)
     prompt = prompt.replace('  ', ' ').strip()

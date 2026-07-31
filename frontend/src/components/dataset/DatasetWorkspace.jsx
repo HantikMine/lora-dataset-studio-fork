@@ -902,6 +902,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <CompositionBar composition={d.composition} upscaled={d.composition_upscaled} bodyFidelity={bodyFid} />
                   <div id="ds-add-generate" tabIndex={-1} className="scroll-mt-20">
                     <VariationCatalog key={`vc-${d.id}-${bodyFid}`} busy={ds.busy}
+                      datasetId={d.id}
+                      refNonce={d.refNonce || ''}
                       generating={act && act.kind === 'generate' ? act : null}
                       onGenerate={(...args) => {
                         // Guard-rail: a batch is already in flight — launching another one

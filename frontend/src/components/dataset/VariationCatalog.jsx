@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Flux2KleinModelPicker from '../shared/Flux2KleinModelPicker';
 import { useToast } from '../common/Toast';
 import { useCapabilities } from '../../context/CapabilitiesContext';
-import { apiFetch } from '../../api/fetchClient';
+import { apiFetch, postJson, postForm } from '../../api/fetchClient';
 import ShotIllustration, { contextEmoji } from './ShotIllustration';
 import { displayLabel } from '../../utils/labels';
 import { kleinMissingLabels } from '../../hooks/useSetupSteps';
@@ -87,9 +87,14 @@ function GpuIcon({ className }) {
   );
 }
 
-export default function VariationCatalog({ onGenerate, busy, generating = null, hasRef, composition, images = [], bodyFidelity = false, promptSuffix = '', promptSuffixes = null, onSaveSuffixes = null }) {
+export default function VariationCatalog({ onGenerate, busy, generating = null, hasRef, composition, images = [], bodyFidelity = false, promptSuffix = '', promptSuffixes = null, onSaveSuffixes = null, datasetId = null, refNonce = '' }) {
   const toast = useToast();
   const { caps } = useCapabilities();
+  // Anima Prompt panel: build the full prompt from VLM + selection, then
+  // generate a single image with it (and optionally promote it to reference).
+  const [animaPrompt, setAnimaPrompt] = useState('');
+  const [animaResult, setAnimaResult] = useState(null);   // {image, filename}
+  const [animaBusy, setAnimaBusy] = useState(false);
   const [catalog, setCatalog] = useState([]);
   const [nsfwCatalog, setNsfwCatalog] = useState([]);
   const [presets, setPresets] = useState({});
@@ -446,6 +451,49 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
       generationLoraPresetPayload({ isKlein, presetName: loraPresetName, presets: loraPresets }));
   };
 
+  // ── Anima Prompt panel: build VLM prompt, generate one image, promote to ref ──
+  const buildAnimaPrompt = async () => {
+    if (!datasetId) { toast.error('Dataset context missing — reload the page'); return; }
+    if (!hasRef) { toast.error('Set a reference photo first'); return; }
+    const shots = catalog.filter((e) => selected.has(e.id))
+      .map((e) => ({ prompt: e.prompt, aspect: '1:1', suffix: (gSuffix || '').trim() }));
+    if (!shots.length) { toast.error('Select at least one shot card first'); return; }
+    setAnimaBusy(true);
+    try {
+      const d = await postJson(`/api/dataset/${datasetId}/anima-prompt`, { shots });
+      setAnimaPrompt(d.prompts[0] || '');
+      toast.success(`Prompt built${d.prompts.length > 1 ? ` (first of ${d.prompts.length})` : ''}`);
+    } catch (e) { toast.error(e.message); }
+    finally { setAnimaBusy(false); }
+  };
+
+  const generateAnimaImage = async () => {
+    if (!datasetId || !animaPrompt.trim()) { toast.error('Build or type a prompt first'); return; }
+    setAnimaBusy(true);
+    setAnimaResult(null);
+    try {
+      const d = await postJson(`/api/dataset/${datasetId}/anima-generate`,
+        { prompt: animaPrompt.trim(), aspect: '1:1' });
+      setAnimaResult({ image: d.image, filename: d.filename });
+    } catch (e) { toast.error(e.message); }
+    finally { setAnimaBusy(false); }
+  };
+
+  const saveAnimaAsRef = async () => {
+    if (!animaResult || !datasetId) return;
+    const bin = atob(animaResult.image);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const fd = new FormData();
+    fd.append('file', new File([arr], animaResult.filename || 'anima-ref.webp',
+      { type: 'image/webp' }));
+    try {
+      await postForm(`/api/dataset/${datasetId}/ref`, fd);
+      toast.success('Saved as the new reference photo');
+      setAnimaResult(null);
+    } catch (e) { toast.error(e.message); }
+  };
+
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
       <div className="flex items-center gap-2">
@@ -570,6 +618,51 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
           </span>
         </button>
       </div>
+
+      {/* Anima Prompt panel: full prompt from VLM + selection, single-image generate,
+          then promote the result to reference. Only for the Anima engine. */}
+      {isAnima && (
+        <div className="flex flex-col gap-2 rounded-lg border border-rose-400/30 bg-rose-500/5 p-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span aria-hidden="true">🧪</span>
+            <span className="text-[0.8125rem] font-semibold text-rose-200">Anima prompt studio</span>
+            <span className="text-[0.625rem] text-content-subtle">
+              build the full prompt from the reference + selection, generate one image, promote it to reference
+            </span>
+            <span className="ml-auto flex gap-1.5">
+              <button type="button" onClick={buildAnimaPrompt} disabled={animaBusy || !hasRef}
+                className="rounded-md border border-rose-400/40 bg-rose-500/10 px-2 py-1 text-[0.625rem] font-semibold text-rose-200 hover:bg-rose-500/20 disabled:opacity-40">
+                {animaBusy ? 'Building…' : '⚡ Build prompt from selection'}
+              </button>
+              <button type="button" onClick={generateAnimaImage}
+                disabled={animaBusy || !animaPrompt.trim()}
+                className="rounded-md border border-rose-400/40 bg-rose-500/15 px-2 py-1 text-[0.625rem] font-semibold text-rose-100 hover:bg-rose-500/25 disabled:opacity-40">
+                {animaBusy ? 'Generating…' : '🎨 Generate image'}
+              </button>
+            </span>
+          </div>
+          <textarea value={animaPrompt} onChange={(e) => setAnimaPrompt(e.target.value)}
+            rows={3} spellCheck={false}
+            placeholder={hasRef ? 'Select shots and press ⚡ Build prompt, or type a raw Anima prompt manually.'
+              : 'Set a reference photo first — the VLM describes it, then the prompt is built from your selection.'}
+            className="w-full rounded-md border border-border bg-app/70 p-2 font-mono text-[0.6875rem] text-content leading-relaxed focus:outline-none focus:ring-1 focus:ring-rose-400/40" />
+          {animaResult && (
+            <div className="flex items-center gap-3 rounded-md border border-border bg-app/50 p-2">
+              <img src={`data:image/webp;base64,${animaResult.image}`} alt="Generated Anima image"
+                className="h-24 w-24 rounded object-cover border border-border" />
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[0.6875rem] text-content-subtle">
+                  Generated {animaResult.filename}
+                </span>
+                <button type="button" onClick={saveAnimaAsRef}
+                  className="self-start rounded-md border border-emerald-400/40 bg-emerald-500/10 px-2 py-1 text-[0.625rem] font-semibold text-emerald-200 hover:bg-emerald-500/20">
+                  💾 Use as the new reference photo
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Preset cards with their framing-mix bar. */}
       <div>
